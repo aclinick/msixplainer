@@ -1,0 +1,28 @@
+## .NET / Visual Studio
+bin/
+obj/
+*.user
+*.suo
+*.cache
+*.vs/
+.vs/
+
+## Build outputs
+*.appx
+*.msix
+*.appxbundle
+*.msixbundle
+AppPackages/
+BundleArtifacts/
+
+## NuGet
+packages/
+*.nupkg
+
+## Rider / JetBrains
+.idea/
+
+## OS files
+Thumbs.db
+desktop.ini
+.DS_Store
