@@ -14,6 +14,9 @@ dotnet run --project MSIXplainer.Cli -- path\to\package.msix
 
 # Run WinUI app (requires Developer Mode)
 cd MSIXplainer && .\BuildAndRun.ps1
+
+# Package as .msixbundle (x64 + ARM64)
+.\Package.ps1
 ```
 
 ```powershell

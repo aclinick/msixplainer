@@ -14,6 +14,7 @@ obj/
 *.msixbundle
 AppPackages/
 BundleArtifacts/
+artifacts/
 
 ## NuGet
 packages/
@@ -26,3 +27,6 @@ packages/
 Thumbs.db
 desktop.ini
 .DS_Store
+
+# Development certificate
+devcert.pfx
