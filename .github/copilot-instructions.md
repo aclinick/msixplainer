@@ -16,7 +16,16 @@ dotnet run --project MSIXplainer.Cli -- path\to\package.msix
 cd MSIXplainer && .\BuildAndRun.ps1
 ```
 
-There are no tests in this repository.
+```powershell
+# Run all tests
+dotnet test MSIXplainer.Core.Tests
+
+# Run a single test by name
+dotnet test MSIXplainer.Core.Tests --filter "FullyQualifiedName~DetectsFullTrust"
+
+# Run all tests in one class
+dotnet test MSIXplainer.Core.Tests --filter "ClassName~RulesEngineTests"
+```
 
 ## Architecture
 
