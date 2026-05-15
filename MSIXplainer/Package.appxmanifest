@@ -9,7 +9,7 @@
   IgnorableNamespaces="uap rescap systemai">
 
   <Identity
-    Name="5BFEC3AB-2C5E-4A08-A820-079ABAE93943"
+    Name="MSIXplainer"
     Publisher="CN=AppPublisher"
     Version="1.0.0.0" />
 
