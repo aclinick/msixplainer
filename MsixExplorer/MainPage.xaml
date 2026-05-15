@@ -86,7 +86,7 @@
                 <FontIcon Glyph="&#xED25;" FontSize="64"
                           Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                           HorizontalAlignment="Center" />
-                <TextBlock Text="MSIX Manifest Explainer"
+                <TextBlock Text="MSIXplainer"
                            HorizontalAlignment="Center"
                            Style="{StaticResource TitleTextBlockStyle}" />
                 <TextBlock Text="Open an .msix or .appx package to analyze its manifest and review security findings."
