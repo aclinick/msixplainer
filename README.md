@@ -79,34 +79,34 @@ cd msixexplainer
 dotnet build
 
 # Or build individual projects
-dotnet build MsixExplainer.Core\MSIXplainer.Core.csproj
-dotnet build MsixExplainer.Cli\MSIXplainer.Cli.csproj
-dotnet build MsixExplorer\MSIXplainer.csproj
+dotnet build MSIXplainer.Core
+dotnet build MSIXplainer.Cli
+dotnet build MSIXplainer
 ```
 
 ### Run the CLI
 
 ```powershell
 # Analyze a real package
-dotnet run --project MsixExplainer.Cli\MSIXplainer.Cli.csproj -- path\to\package.msix
+dotnet run --project MSIXplainer.Cli -- path\to\package.msix
 
 # Use the built-in sample manifest (Contoso Collaboration Hub)
-dotnet run --project MsixExplainer.Cli\MSIXplainer.Cli.csproj -- --sample
+dotnet run --project MSIXplainer.Cli -- --sample
 
 # Export to Markdown
-dotnet run --project MsixExplainer.Cli\MSIXplainer.Cli.csproj -- --sample --markdown --output review.md
+dotnet run --project MSIXplainer.Cli -- --sample --markdown --output review.md
 
 # Export to JSON
-dotnet run --project MsixExplainer.Cli\MSIXplainer.Cli.csproj -- --sample --json
+dotnet run --project MSIXplainer.Cli -- --sample --json
 
 # Filter by severity
-dotnet run --project MsixExplainer.Cli\MSIXplainer.Cli.csproj -- package.msix --severity warning
+dotnet run --project MSIXplainer.Cli -- package.msix --severity warning
 
 # Quiet mode (exit code only — useful for CI)
-dotnet run --project MsixExplainer.Cli\MSIXplainer.Cli.csproj -- package.msix --quiet
+dotnet run --project MSIXplainer.Cli -- package.msix --quiet
 
 # Analyze multiple packages with glob
-dotnet run --project MsixExplainer.Cli\MSIXplainer.Cli.csproj -- "C:\packages\*.msix"
+dotnet run --project MSIXplainer.Cli -- "C:\packages\*.msix"
 ```
 
 #### CLI Exit Codes
@@ -122,12 +122,12 @@ These exit codes make the CLI usable as a CI/CD gate.
 ### Run the WinUI App
 
 ```powershell
-# From the MsixExplorer directory
-cd MsixExplorer
+# From the MSIXplainer directory
+cd MSIXplainer
 .\BuildAndRun.ps1
 ```
 
-Or open the solution in Visual Studio and run the `MsixExplorer` project.
+Or open the solution in Visual Studio and run the `MSIXplainer` project.
 
 ---
 
@@ -135,7 +135,7 @@ Or open the solution in Visual Studio and run the `MsixExplorer` project.
 
 ```
 msixexplainer/
-├── MsixExplainer.Core/          # Shared class library
+├── MSIXplainer.Core/            # Shared class library
 │   ├── Models/                  # ManifestFinding, PackageInfo, PropertyGroup, Section
 │   └── Services/
 │       ├── ManifestParserService.cs    # Safe ZIP/XML extraction
@@ -143,11 +143,11 @@ msixexplainer/
 │       ├── ManifestExplainerService.cs # Section-by-section explainer
 │       ├── ExportService.cs            # Markdown + JSON export
 │       └── SampleManifest.cs           # Built-in test manifest
-├── MsixExplorer/                # WinUI 3 desktop app
+├── MSIXplainer/                 # WinUI 3 desktop app
 │   ├── MainPage.xaml            # NavigationView + property viewer
 │   ├── ViewModels/              # MVVM with CommunityToolkit.Mvvm
 │   └── Package.appxmanifest
-└── MsixExplainer.Cli/           # Spectre.Console CLI
+└── MSIXplainer.Cli/             # Spectre.Console CLI
     └── Program.cs               # Animated output, tables, trees
 ```
 

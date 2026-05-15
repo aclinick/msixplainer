@@ -1,7 +1,7 @@
 using System.Xml.Linq;
-using MsixExplorer.Models;
+using MSIXplainer.Models;
 
-namespace MsixExplorer.Services;
+namespace MSIXplainer.Services;
 
 /// <summary>
 /// Builds explained property groups from manifest XML for each section.

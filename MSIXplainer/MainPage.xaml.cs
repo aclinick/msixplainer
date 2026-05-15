@@ -4,11 +4,11 @@ using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
-using MsixExplorer.Models;
-using MsixExplorer.ViewModels;
+using MSIXplainer.Models;
+using MSIXplainer.ViewModels;
 using Windows.Storage.Streams;
 
-namespace MsixExplorer;
+namespace MSIXplainer;
 
 public sealed partial class MainPage : Page
 {

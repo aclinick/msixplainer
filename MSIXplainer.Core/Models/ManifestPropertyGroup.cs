@@ -1,4 +1,4 @@
-namespace MsixExplorer.Models;
+namespace MSIXplainer.Models;
 
 /// <summary>
 /// A group of related manifest properties displayed together with a header.

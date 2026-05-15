@@ -1,4 +1,4 @@
-# Copilot Instructions — MSIX Manifest Explainer
+# Copilot Instructions — MSIXplainer
 
 ## Build & Run
 
@@ -7,24 +7,24 @@
 dotnet build
 
 # Run CLI with built-in sample manifest
-dotnet run --project MsixExplainer.Cli -- --sample
+dotnet run --project MSIXplainer.Cli -- --sample
 
 # Run CLI against a real package
-dotnet run --project MsixExplainer.Cli -- path\to\package.msix
+dotnet run --project MSIXplainer.Cli -- path\to\package.msix
 
 # Run WinUI app (requires Developer Mode)
-cd MsixExplorer && .\BuildAndRun.ps1
+cd MSIXplainer && .\BuildAndRun.ps1
 ```
 
 There are no tests in this repository.
 
 ## Architecture
 
-Three-project .NET 10 solution (`MsixExplainer.slnx`):
+Three-project .NET 10 solution (`MSIXplainer.slnx`):
 
-- **MsixExplainer.Core** — Shared class library with all analysis logic. No UI dependencies.
-- **MsixExplainer.Cli** — Console frontend using Spectre.Console. Hand-rolled arg parsing in `Program.cs`.
-- **MsixExplorer** — WinUI 3 desktop app (Windows App SDK 2.0, packaged MSIX).
+- **MSIXplainer.Core** — Shared class library with all analysis logic. No UI dependencies.
+- **MSIXplainer.Cli** — Console frontend using Spectre.Console. Hand-rolled arg parsing in `Program.cs`.
+- **MSIXplainer** — WinUI 3 desktop app (Windows App SDK 2.0, packaged MSIX).
 
 ### Core processing pipeline
 
@@ -47,7 +47,7 @@ Add a private `Analyze*` method in `RulesEngine.cs` and call it from `Analyze()`
 
 ## Key Conventions
 
-- **Namespace:** All projects use `RootNamespace` of `MsixExplorer` (note: the solution folder is `msixexplainer`, project folders use mixed casing like `MsixExplainer.Core`, but the C# namespace is always `MsixExplorer`).
+- **Namespace:** All projects use `RootNamespace` of `MSIXplainer`. Sub-namespaces follow the pattern `MSIXplainer.Models`, `MSIXplainer.Services`, `MSIXplainer.ViewModels`.
 - **All Core services are static classes** — no DI, no interfaces. The CLI and WinUI app call them directly.
 - **Models use `required init` properties** — `ManifestFinding`, `ManifestSection` use C# `required` + `init` pattern.
 - **WinUI app uses CommunityToolkit.Mvvm** — `MainPageViewModel` uses `[ObservableProperty]` source generators with the partial property syntax (`public partial bool IsPackageLoaded { get; set; }`).

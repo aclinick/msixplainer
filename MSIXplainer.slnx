@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="MSIXplainer.Cli/MSIXplainer.Cli.csproj" />
+  <Project Path="MSIXplainer.Core/MSIXplainer.Core.csproj" />
+  <Project Path="MSIXplainer/MSIXplainer.csproj" />
+</Solution>
+

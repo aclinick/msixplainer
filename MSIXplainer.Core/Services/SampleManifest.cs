@@ -1,4 +1,4 @@
-namespace MsixExplorer.Services;
+namespace MSIXplainer.Services;
 
 /// <summary>
 /// Provides a realistic Teams-like sample manifest for testing.

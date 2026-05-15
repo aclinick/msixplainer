@@ -1,4 +1,4 @@
-namespace MsixExplorer.Models;
+namespace MSIXplainer.Models;
 
 public enum FindingSeverity
 {

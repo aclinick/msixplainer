@@ -1,9 +1,9 @@
 using System.IO.Compression;
 using System.Xml;
 using System.Xml.Linq;
-using MsixExplorer.Models;
+using MSIXplainer.Models;
 
-namespace MsixExplorer.Services;
+namespace MSIXplainer.Services;
 
 public static class ManifestParserService
 {

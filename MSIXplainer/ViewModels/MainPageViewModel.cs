@@ -3,10 +3,10 @@ using System.Xml.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Windows.Storage.Pickers;
-using MsixExplorer.Models;
-using MsixExplorer.Services;
+using MSIXplainer.Models;
+using MSIXplainer.Services;
 
-namespace MsixExplorer.ViewModels;
+namespace MSIXplainer.ViewModels;
 
 public partial class MainPageViewModel : ObservableObject
 {

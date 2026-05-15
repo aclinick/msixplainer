@@ -1,4 +1,4 @@
-namespace MsixExplorer.Models;
+namespace MSIXplainer.Models;
 
 /// <summary>
 /// Represents a section in the NavigationView — either the overview,

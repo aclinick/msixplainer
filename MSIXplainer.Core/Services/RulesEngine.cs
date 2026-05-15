@@ -1,7 +1,7 @@
 using System.Xml.Linq;
-using MsixExplorer.Models;
+using MSIXplainer.Models;
 
-namespace MsixExplorer.Services;
+namespace MSIXplainer.Services;
 
 /// <summary>
 /// Deterministic rules engine that analyzes an MSIX/APPX manifest and produces

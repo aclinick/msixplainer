@@ -2,9 +2,9 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Xml.Linq;
-using MsixExplorer.Models;
+using MSIXplainer.Models;
 
-namespace MsixExplorer.Services;
+namespace MSIXplainer.Services;
 
 public static class ExportService
 {

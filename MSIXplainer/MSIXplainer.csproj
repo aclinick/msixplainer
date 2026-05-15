@@ -4,7 +4,7 @@
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows10.0.26100.0</TargetFramework>
     <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
-    <RootNamespace>MsixExplorer</RootNamespace>
+    <RootNamespace>MSIXplainer</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <Platforms>x64;ARM64</Platforms>
     <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
@@ -51,7 +51,7 @@
     <PropertyGroup> above to opt out.
   -->
   <ItemGroup>
-    <ProjectReference Include="..\MsixExplainer.Core\MSIXplainer.Core.csproj" />
+    <ProjectReference Include="..\MSIXplainer.Core\MSIXplainer.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup>

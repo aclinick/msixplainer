@@ -1,9 +1,9 @@
 using System.Text;
-using MsixExplorer.Models;
-using MsixExplorer.Services;
+using MSIXplainer.Models;
+using MSIXplainer.Services;
 using Spectre.Console;
 
-namespace MsixExplorer;
+namespace MSIXplainer;
 
 static class Program
 {
