@@ -75,13 +75,27 @@ public partial class MainPageViewModel : ObservableObject
             };
             picker.FileTypeFilter.Add(".msix");
             picker.FileTypeFilter.Add(".appx");
+            picker.FileTypeFilter.Add(".msixbundle");
+            picker.FileTypeFilter.Add(".appxbundle");
 
             var result = await picker.PickSingleFileAsync();
             if (result is null) return;
 
             PackageFilePath = result.Path;
-            var (manifest, rawXml, info) = ManifestParserService.ExtractFromPackage(result.Path);
-            AnalyzeManifest(rawXml, info, manifest);
+
+            if (ManifestParserService.IsBundleFile(result.Path))
+            {
+                var packages = ManifestParserService.ExtractFromBundle(result.Path);
+                // Analyze the first package in the bundle (typically the current platform arch)
+                var pkg = packages.First();
+                PackageFilePath = $"{result.Path} ({pkg.Label})";
+                AnalyzeManifest(pkg.RawXml, pkg.Info, pkg.Manifest);
+            }
+            else
+            {
+                var (manifest, rawXml, info) = ManifestParserService.ExtractFromPackage(result.Path);
+                AnalyzeManifest(rawXml, info, manifest);
+            }
         }
         catch (Exception ex)
         {

@@ -10,6 +10,23 @@ public static class ManifestParserService
     private static readonly XNamespace Ns =
         "http://schemas.microsoft.com/appx/manifest/foundation/windows10";
 
+    private static readonly string[] BundleExtensions = [".msixbundle", ".appxbundle"];
+    private static readonly string[] PackageExtensions = [".msix", ".appx"];
+
+    /// <summary>
+    /// Returns true if the file extension indicates a bundle (ZIP of MSIX packages).
+    /// </summary>
+    public static bool IsBundleFile(string filePath)
+        => BundleExtensions.Any(ext =>
+            filePath.EndsWith(ext, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
+    /// Returns true if the file extension indicates a single package or a bundle.
+    /// </summary>
+    public static bool IsSupportedFile(string filePath)
+        => PackageExtensions.Concat(BundleExtensions)
+            .Any(ext => filePath.EndsWith(ext, StringComparison.OrdinalIgnoreCase));
+
     /// <summary>
     /// Extracts AppxManifest.xml from an MSIX/APPX package (ZIP archive).
     /// Treats the package as untrusted: no code execution, no DTD processing.
@@ -17,6 +34,77 @@ public static class ManifestParserService
     public static (XDocument Manifest, string RawXml, PackageInfo Info) ExtractFromPackage(string filePath)
     {
         using var archive = ZipFile.OpenRead(filePath);
+        return ExtractFromArchive(archive);
+    }
+
+    /// <summary>
+    /// Extracts manifests from all inner MSIX/APPX packages in a bundle.
+    /// Returns one result per architecture found in the bundle.
+    /// </summary>
+    public static List<BundlePackageResult> ExtractFromBundle(string filePath)
+    {
+        var results = new List<BundlePackageResult>();
+
+        using var bundleArchive = ZipFile.OpenRead(filePath);
+        var msixEntries = bundleArchive.Entries
+            .Where(e => PackageExtensions.Any(ext =>
+                e.FullName.EndsWith(ext, StringComparison.OrdinalIgnoreCase)))
+            .OrderBy(e => e.FullName)
+            .ToList();
+
+        if (msixEntries.Count == 0)
+            throw new InvalidOperationException(
+                "This bundle does not contain any MSIX or APPX packages.");
+
+        foreach (var msixEntry in msixEntries)
+        {
+            // Guard: skip unreasonably large inner packages (500 MB)
+            if (msixEntry.Length > 500 * 1024 * 1024)
+                continue;
+
+            using var msixStream = msixEntry.Open();
+            using var memoryStream = new MemoryStream();
+            msixStream.CopyTo(memoryStream);
+            memoryStream.Position = 0;
+
+            using var innerArchive = new ZipArchive(memoryStream, ZipArchiveMode.Read);
+
+            try
+            {
+                var (manifest, rawXml, info) = ExtractFromArchive(innerArchive);
+                results.Add(new BundlePackageResult
+                {
+                    EntryName = msixEntry.FullName,
+                    Manifest = manifest,
+                    RawXml = rawXml,
+                    Info = info
+                });
+            }
+            catch (InvalidOperationException)
+            {
+                // Skip entries without a valid manifest (e.g., resource packages)
+            }
+        }
+
+        if (results.Count == 0)
+            throw new InvalidOperationException(
+                "No valid MSIX/APPX packages with manifests found in this bundle.");
+
+        return results;
+    }
+
+    /// <summary>
+    /// Parses raw manifest XML (used for sample/testing).
+    /// </summary>
+    public static (XDocument Manifest, string RawXml, PackageInfo Info) ParseRawXml(string xml)
+    {
+        var doc = ParseXmlSafely(xml);
+        var info = ExtractPackageInfo(doc);
+        return (doc, xml, info);
+    }
+
+    private static (XDocument Manifest, string RawXml, PackageInfo Info) ExtractFromArchive(ZipArchive archive)
+    {
         var entry = archive.GetEntry("AppxManifest.xml")
             ?? throw new InvalidOperationException(
                 "This file does not contain an AppxManifest.xml. Ensure it is a valid MSIX or APPX package.");
@@ -34,16 +122,6 @@ public static class ManifestParserService
         var info = ExtractPackageInfo(doc);
         info.AppIconBytes = TryExtractAppIcon(archive, doc);
         return (doc, rawXml, info);
-    }
-
-    /// <summary>
-    /// Parses raw manifest XML (used for sample/testing).
-    /// </summary>
-    public static (XDocument Manifest, string RawXml, PackageInfo Info) ParseRawXml(string xml)
-    {
-        var doc = ParseXmlSafely(xml);
-        var info = ExtractPackageInfo(doc);
-        return (doc, xml, info);
     }
 
     private static XDocument ParseXmlSafely(string xml)

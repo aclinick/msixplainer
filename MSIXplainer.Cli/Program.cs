@@ -21,7 +21,7 @@ static class Program
 
         if (!options.IsValid)
         {
-            AnsiConsole.MarkupLine("[red]Error:[/] Provide a path to an .msix/.appx file, or use --sample.");
+            AnsiConsole.MarkupLine("[red]Error:[/] Provide a path to an .msix/.appx/.msixbundle file, or use --sample.");
             return 1;
         }
 
@@ -42,14 +42,83 @@ static class Program
 
         foreach (var file in files)
         {
-            if (files.Count > 1 || options.UseSample)
+            if (ManifestParserService.IsBundleFile(file))
+            {
+                var exit = AnalyzeBundle(file, options);
+                if (exit > worstExit) worstExit = exit;
+            }
+            else
+            {
+                if (files.Count > 1 || options.UseSample)
+                {
+                    AnsiConsole.WriteLine();
+                    AnsiConsole.Write(new Rule($"[bold]{Markup.Escape(Path.GetFileName(file))}[/]").LeftJustified());
+                }
+
+                var exit = AnalyzeOne(file, options);
+                if (exit > worstExit) worstExit = exit;
+            }
+        }
+
+        return worstExit;
+    }
+
+    static int AnalyzeBundle(string filePath, CliOptions options)
+    {
+        int worstExit = 0;
+
+        try
+        {
+            var packages = AnsiConsole.Status()
+                .AutoRefresh(true)
+                .Spinner(Spinner.Known.Dots)
+                .SpinnerStyle(Style.Parse("cyan"))
+                .Start("Opening bundle...", ctx =>
+                {
+                    ctx.Status($"Extracting packages from {Path.GetFileName(filePath)}...");
+                    return ManifestParserService.ExtractFromBundle(filePath);
+                });
+
+            AnsiConsole.WriteLine();
+            AnsiConsole.Write(new Rule($"[bold]{Markup.Escape(Path.GetFileName(filePath))}[/] [grey]({packages.Count} package(s))[/]").LeftJustified());
+
+            foreach (var pkg in packages)
             {
                 AnsiConsole.WriteLine();
-                AnsiConsole.Write(new Rule($"[bold]{Markup.Escape(Path.GetFileName(file))}[/]").LeftJustified());
-            }
+                AnsiConsole.Write(new Rule($"[cyan]{Markup.Escape(pkg.Label)}[/] [grey]({pkg.Info.Architecture})[/]").LeftJustified());
 
-            var exit = AnalyzeOne(file, options);
-            if (exit > worstExit) worstExit = exit;
+                var findings = RulesEngine.Analyze(pkg.Manifest);
+                pkg.Info.CriticalCount = findings.Count(f => f.Severity == FindingSeverity.Critical);
+                pkg.Info.WarningCount = findings.Count(f => f.Severity == FindingSeverity.Warning);
+                pkg.Info.ReviewCount = findings.Count(f => f.Severity == FindingSeverity.Review);
+                pkg.Info.InfoCount = findings.Count(f => f.Severity == FindingSeverity.Info);
+
+                if (options.MinSeverity is not null)
+                    findings = findings.Where(f => f.Severity >= options.MinSeverity.Value).ToList();
+
+                switch (options.Format)
+                {
+                    case OutputFormat.Json:
+                        Write(options, ExportService.ExportToJson(pkg.Info, findings));
+                        break;
+                    case OutputFormat.Markdown:
+                        Write(options, ExportService.ExportToMarkdown(pkg.Manifest.Root!, pkg.Info, findings));
+                        break;
+                    case OutputFormat.Quiet:
+                        break;
+                    default:
+                        PrintConsoleReport(pkg.Info, findings);
+                        break;
+                }
+
+                var exit = pkg.Info.CriticalCount > 0 ? 2 : pkg.Info.WarningCount > 0 ? 1 : 0;
+                if (exit > worstExit) worstExit = exit;
+            }
+        }
+        catch (Exception ex)
+        {
+            AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(ex.Message)}");
+            return 1;
         }
 
         return worstExit;
@@ -338,6 +407,7 @@ static class Program
 
         table.AddRow("[cyan bold]Usage:[/]", "");
         table.AddRow("  msixplainer [grey]<file.msix>[/]", "Analyze a package");
+        table.AddRow("  msixplainer [grey]<file.msixbundle>[/]", "Analyze all packages in a bundle");
         table.AddRow("  msixplainer [grey]*.msix[/]", "Analyze multiple packages");
         table.AddRow("  msixplainer [grey]--sample[/]", "Analyze built-in sample manifest");
         table.AddRow("", "");

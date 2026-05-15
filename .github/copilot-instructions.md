@@ -42,7 +42,7 @@ Three-project .NET 10 solution (`MSIXplainer.slnx`):
 
 All analysis flows through the same Core services in this order:
 
-1. **`ManifestParserService`** — Extracts `AppxManifest.xml` from `.msix`/`.appx` ZIP archives with security guards (DTD prohibited, XML resolver null, 10 MB cap, no code execution).
+1. **`ManifestParserService`** — Extracts `AppxManifest.xml` from `.msix`/`.appx` ZIP archives (and `.msixbundle`/`.appxbundle` ZIP-of-ZIP archives) with security guards (DTD prohibited, XML resolver null, 10 MB cap, no code execution).
 2. **`RulesEngine.Analyze(XDocument)`** — Static `Analyze` method runs 18 deterministic rule methods against manifest XML, returns `List<ManifestFinding>` sorted by severity then category. Each finding has `Category`, `Severity`, `Title`, `Description`, `WhyItMatters`, `Recommendation`, and optional `XmlSnippet`.
 3. **`ManifestExplainerService`** — Builds section-by-section `ManifestSection` + `ManifestPropertyGroup` structures with plain-English explanations of every XML element.
 4. **`ExportService`** — Generates annotated Markdown reports and structured JSON from findings.
