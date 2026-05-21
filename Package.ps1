@@ -28,18 +28,30 @@ Password for the certificate. Default: password.
 .PARAMETER SelfContained
 Bundle Windows App SDK runtime (larger but no runtime dependency).
 
+.PARAMETER NoBump
+Skip the automatic version bump.
+
+.PARAMETER BumpRevision
+Bump the 4th version segment (revision) instead of the 3rd (build). Useful for
+rapid local sideload iterations. NOTE: Microsoft Store requires the 4th segment
+to be 0, so don't use this for Store-bound builds.
+
 .EXAMPLE
-.\Package.ps1                              # Full build + bundle
+.\Package.ps1                              # Auto-bumps build segment, full build + bundle
 .\Package.ps1 -SkipTests                   # Skip tests
 .\Package.ps1 -CertPath .\prod.pfx         # Use existing cert
 .\Package.ps1 -SelfContained               # Include WinAppSDK runtime
+.\Package.ps1 -BumpRevision                # Bump revision only (sideload only)
+.\Package.ps1 -NoBump                      # Repackage same version
 #>
 
 param(
     [switch]$SkipTests,
     [string]$CertPath,
     [string]$CertPassword = "password",
-    [switch]$SelfContained
+    [switch]$SelfContained,
+    [switch]$NoBump,
+    [switch]$BumpRevision
 )
 
 $ErrorActionPreference = 'Stop'
@@ -57,6 +69,40 @@ if (-not $winapp) {
     Write-Host "ERROR: winapp CLI not found in PATH." -ForegroundColor Red
     Write-Host "Install: dotnet tool install -g Microsoft.Windows.Dev.CLI" -ForegroundColor Yellow
     exit 1
+}
+
+# ── 0.5 Auto-bump manifest version ──
+
+if (-not $NoBump) {
+    $manifestContent = [System.IO.File]::ReadAllText($manifest)
+    $versionRegex = '(<Identity\b[^>]*\bVersion=")(\d+)\.(\d+)\.(\d+)\.(\d+)(")'
+    $match = [regex]::Match($manifestContent, $versionRegex)
+    if (-not $match.Success) {
+        Write-Host "ERROR: Could not locate Identity Version in $manifest" -ForegroundColor Red
+        exit 1
+    }
+    $major    = [int]$match.Groups[2].Value
+    $minor    = [int]$match.Groups[3].Value
+    $build    = [int]$match.Groups[4].Value
+    $revision = [int]$match.Groups[5].Value
+    $oldVer   = "$major.$minor.$build.$revision"
+
+    if ($BumpRevision) {
+        $revision++
+    } else {
+        $build++
+        $revision = 0
+    }
+
+    $newVer = "$major.$minor.$build.$revision"
+    $manifestContent = [regex]::Replace(
+        $manifestContent, $versionRegex,
+        "`${1}$newVer`${6}", 1)
+
+    # Preserve UTF-8 BOM (WinAppSDK manifest tooling expects it)
+    [System.IO.File]::WriteAllText($manifest, $manifestContent, [System.Text.UTF8Encoding]::new($true))
+
+    Write-Host "`n=== Version bumped $oldVer -> $newVer ===" -ForegroundColor Cyan
 }
 
 # ── 1. Run tests ──
@@ -113,25 +159,45 @@ if (Test-Path $vswhere) {
 
 # ── 5. Build + Package each architecture ──
 
-$msixFiles = @()
+$cliProject  = Join-Path $PSScriptRoot "MSIXplainer.Cli\MSIXplainer.Cli.csproj"
+$cliProjDir  = Split-Path $cliProject -Parent
+$msixFiles   = @()
 
 foreach ($platform in $platforms) {
-    Write-Host "`n=== Building $platform Release ===" -ForegroundColor Cyan
-
     $rid = $platform.ToLower()
 
+    Write-Host "`n=== Cleaning bin\$platform\Release (WinUI + CLI) ===" -ForegroundColor DarkGray
+    # Wipe stale outputs (old project names, embedded .msix, etc.) before each platform build.
+    Remove-Item (Join-Path $projectDir "bin\$platform\Release") -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-Item (Join-Path $cliProjDir "bin\$platform\Release") -Recurse -Force -ErrorAction SilentlyContinue
+
+    Write-Host "`n=== Building CLI ($platform Release) ===" -ForegroundColor Cyan
+    # Publish self-contained so the apphost looks for the runtime alongside itself.
+    # We copy only the CLI-specific files; the WinUI publish below supplies the
+    # actual .NET 10 runtime DLLs (coreclr.dll, System.*.dll, etc.) in the same
+    # package folder, so we don't duplicate the runtime.
+    if ($msbuild) {
+        & $msbuild $cliProject /nologo /v:m /restore /t:Publish /p:Configuration=Release /p:Platform=$platform /p:RuntimeIdentifier=win-$rid /p:SelfContained=true /p:PublishSingleFile=false /p:PublishTrimmed=false
+    } else {
+        dotnet publish $cliProject -c Release -p:Platform=$platform -r win-$rid --self-contained true -p:PublishSingleFile=false -p:PublishTrimmed=false -v m
+    }
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "ERROR: $platform CLI build failed." -ForegroundColor Red
+        exit 1
+    }
+
+    Write-Host "`n=== Building WinUI ($platform Release) ===" -ForegroundColor Cyan
     if ($msbuild) {
         & $msbuild $project /nologo /v:m /restore /p:Configuration=Release /p:Platform=$platform
     } else {
         dotnet build $project -c Release -p:Platform=$platform -v m
     }
-
     if ($LASTEXITCODE -ne 0) {
-        Write-Host "ERROR: $platform build failed." -ForegroundColor Red
+        Write-Host "ERROR: $platform WinUI build failed." -ForegroundColor Red
         exit 1
     }
 
-    # Locate build output
+    # Locate WinUI build output (the folder winapp package will pack)
     $binDir = Join-Path $projectDir "bin\$platform\Release"
     $tfmDir = Get-ChildItem $binDir -Directory | Where-Object { $_.Name -match "^net\d" } |
               Sort-Object Name -Descending | Select-Object -First 1
@@ -142,6 +208,43 @@ foreach ($platform in $platforms) {
 
     $outputDir = Join-Path $tfmDir.FullName "win-$rid"
     if (-not (Test-Path $outputDir)) { $outputDir = $tfmDir.FullName }
+
+    # Locate CLI publish output and copy required files alongside MSIXplainer.exe.
+    # Look for a "publish" subfolder under the TFM/RID layout.
+    $cliBinDir = Join-Path $cliProjDir "bin\$platform\Release"
+    $cliTfmDir = Get-ChildItem $cliBinDir -Directory -ErrorAction SilentlyContinue |
+                 Where-Object { $_.Name -match "^net\d" } |
+                 Sort-Object Name -Descending | Select-Object -First 1
+    if (-not $cliTfmDir) {
+        Write-Host "ERROR: CLI build output not found under $cliBinDir" -ForegroundColor Red
+        exit 1
+    }
+    $cliPublishDir = Join-Path $cliTfmDir.FullName "win-$rid\publish"
+    if (-not (Test-Path $cliPublishDir)) {
+        # Fallback: publish drops into TFM\RID without a "publish" subfolder when invoked via MSBuild target.
+        $cliPublishDir = Join-Path $cliTfmDir.FullName "win-$rid"
+    }
+    if (-not (Test-Path $cliPublishDir)) {
+        Write-Host "ERROR: CLI publish folder not found: expected $cliPublishDir" -ForegroundColor Red
+        exit 1
+    }
+
+    $cliFiles = @(
+        "MSIXplainer.Cli.exe",
+        "MSIXplainer.Cli.dll",
+        "MSIXplainer.Cli.deps.json",
+        "MSIXplainer.Cli.runtimeconfig.json",
+        "Spectre.Console.dll"
+    )
+    foreach ($f in $cliFiles) {
+        $src = Join-Path $cliPublishDir $f
+        if (-not (Test-Path $src)) {
+            Write-Host "ERROR: Missing CLI artifact: $src" -ForegroundColor Red
+            exit 1
+        }
+        Copy-Item $src -Destination $outputDir -Force
+    }
+    Write-Host "Copied CLI binaries into $outputDir" -ForegroundColor DarkGray
 
     Write-Host "`n=== Packaging $platform ===" -ForegroundColor Cyan
 

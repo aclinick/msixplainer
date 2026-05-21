@@ -1,7 +1,24 @@
 <Solution>
-  <Project Path="MSIXplainer.Cli/MSIXplainer.Cli.csproj" />
-  <Project Path="MSIXplainer.Core.Tests/MSIXplainer.Core.Tests.csproj" />
-  <Project Path="MSIXplainer.Core/MSIXplainer.Core.csproj" />
-  <Project Path="MSIXplainer/MSIXplainer.csproj" />
+  <Configurations>
+    <Platform Name="ARM64" />
+    <Platform Name="x64" />
+  </Configurations>
+  <Project Path="MSIXplainer.Cli/MSIXplainer.Cli.csproj">
+    <Platform Solution="*|ARM64" Project="ARM64" />
+    <Platform Solution="*|x64" Project="x64" />
+  </Project>
+  <Project Path="MSIXplainer.Core.Tests/MSIXplainer.Core.Tests.csproj">
+    <Platform Solution="*|ARM64" Project="ARM64" />
+    <Platform Solution="*|x64" Project="x64" />
+  </Project>
+  <Project Path="MSIXplainer.Core/MSIXplainer.Core.csproj">
+    <Platform Solution="*|ARM64" Project="ARM64" />
+    <Platform Solution="*|x64" Project="x64" />
+  </Project>
+  <Project Path="MSIXplainer/MSIXplainer.csproj">
+    <Platform Solution="*|ARM64" Project="ARM64" />
+    <Platform Solution="*|x64" Project="x64" />
+    <Deploy />
+  </Project>
 </Solution>
 

@@ -4,5 +4,6 @@
     <RootNamespace>MSIXplainer</RootNamespace>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <Platforms>AnyCPU;ARM64;x64</Platforms>
   </PropertyGroup>
 </Project>

@@ -20,7 +20,7 @@ cd MSIXplainer && .\BuildAndRun.ps1
 ```
 
 ```powershell
-# Run all tests
+# Run all tests (xUnit)
 dotnet test MSIXplainer.Core.Tests
 
 # Run a single test by name
@@ -30,13 +30,15 @@ dotnet test MSIXplainer.Core.Tests --filter "FullyQualifiedName~DetectsFullTrust
 dotnet test MSIXplainer.Core.Tests --filter "ClassName~RulesEngineTests"
 ```
 
+Test files mirror the service they cover: `RulesEngineTests.cs`, `ManifestParserServiceTests.cs`, `ManifestExplainerServiceTests.cs`, `ExportServiceTests.cs`, `BundleExtractionTests.cs`.
+
 ## Architecture
 
 Three-project .NET 10 solution (`MSIXplainer.slnx`):
 
-- **MSIXplainer.Core** — Shared class library with all analysis logic. No UI dependencies.
-- **MSIXplainer.Cli** — Console frontend using Spectre.Console. Hand-rolled arg parsing in `Program.cs`.
-- **MSIXplainer** — WinUI 3 desktop app (Windows App SDK 2.0, packaged MSIX).
+- **MSIXplainer.Core** — Shared class library with all analysis logic. No UI dependencies. Targets `net10.0`, `Nullable` enabled, supports `AnyCPU;ARM64;x64`.
+- **MSIXplainer.Cli** — Console frontend using Spectre.Console. Hand-rolled arg parsing in `Program.cs`. Supports `--sample`, `--markdown`, `--json`, `--output`, `--severity`, `--quiet`, and glob input.
+- **MSIXplainer** — WinUI 3 desktop app (Windows App SDK 2.0, packaged MSIX). `NavigationView` + property viewer in `MainPage.xaml`.
 
 ### Core processing pipeline
 
@@ -66,3 +68,5 @@ Add a private `Analyze*` method in `RulesEngine.cs` and call it from `Analyze()`
 - **Security model** — Packages are always treated as untrusted input. Never execute code from packages. XML parsing must prohibit DTD processing and null out the XML resolver.
 - **Severity levels:** Critical (`🔴`), Warning (`🟡`), Review (`🔵`), Info (`ℹ️`) — used consistently in CLI output, Markdown export, and WinUI display.
 - **CLI exit codes:** 0 = clean, 1 = warnings found, 2 = critical findings found. These support CI/CD gating.
+- **C# style:** Use latest C# language features (primary constructors, collection expressions, `required init`, file-scoped namespaces). Comment only when clarification is needed — no boilerplate doc comments.
+- **No DI / no interfaces in Core** — call static services directly. Don't introduce DI containers or interface abstractions for Core services.
