@@ -119,6 +119,43 @@ dotnet run --project MSIXplainer.Cli -- "C:\packages\*.msix"
 
 These exit codes make the CLI usable as a CI/CD gate.
 
+#### Customizing Rule Severities
+
+Every rule emitted by the engine has a stable `RuleId` (e.g. `trust.fullTrust`,
+`virt.filesystemDisabled`, `services.windowsService`). You can override the
+severity of any rule without changing the rule text by dropping a JSON file at:
+
+```
+%LOCALAPPDATA%\MSIXplainer\rules.json
+```
+
+Both the CLI and the WinUI app auto-load this file on every analysis. The CLI
+also accepts `--rules <file>` to layer an additional override file on top —
+useful for checking team-wide rules.json into a repo for CI gating.
+
+Example `rules.json`:
+
+```json
+{
+  "trust.fullTrust": "Info",
+  "services.windowsService": "Warning",
+  "capability.broadFileSystemAccess": "Critical"
+}
+```
+
+Valid severities: `Info`, `Review`, `Warning`, `Critical`. Unknown rule IDs and
+unrecognized severity values are skipped with a warning.
+
+To see every available rule ID, its default, and the effective severity after
+overrides, run:
+
+```powershell
+msixplainer rules list
+```
+
+Rule text (Title, Description, WhyItMatters, Recommendation) is intentionally
+**not** user-editable — only the severity dial is.
+
 ### Run the WinUI App
 
 ```powershell

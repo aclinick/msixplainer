@@ -17,6 +17,11 @@ static class Program
             return 0;
         }
 
+        if (string.Equals(args[0], "rules", StringComparison.OrdinalIgnoreCase))
+        {
+            return RunRulesSubcommand(args.Skip(1).ToArray());
+        }
+
         var options = ParseArgs(args);
 
         if (!options.IsValid)
@@ -24,6 +29,8 @@ static class Program
             AnsiConsole.MarkupLine("[red]Error:[/] Provide a path to an .msix/.appx/.msixbundle file, or use --sample.");
             return 1;
         }
+
+        options.Overrides = LoadOverrides(options);
 
         // Collect all file paths (supports wildcards)
         var files = ResolveFiles(options);
@@ -63,6 +70,142 @@ static class Program
         return worstExit;
     }
 
+    static RuleSeverityOverrides LoadOverrides(CliOptions options)
+    {
+        var layers = new List<RuleSeverityOverrides>();
+        var quiet = options.Format == OutputFormat.Quiet;
+        Action<string>? warn = quiet
+            ? null
+            : msg => AnsiConsole.MarkupLine($"[yellow]Warning:[/] {Markup.Escape(msg)}");
+
+        if (File.Exists(RuleSeverityOverrides.DefaultUserPath))
+        {
+            layers.Add(RuleSeverityOverrides.LoadFromFile(
+                RuleSeverityOverrides.DefaultUserPath,
+                RuleCatalog.KnownRuleIds,
+                warn));
+        }
+
+        if (!string.IsNullOrEmpty(options.RulesFile))
+        {
+            if (!File.Exists(options.RulesFile))
+            {
+                if (!quiet)
+                    AnsiConsole.MarkupLine($"[yellow]Warning:[/] Rules file not found: {Markup.Escape(options.RulesFile)}");
+            }
+            else
+            {
+                layers.Add(RuleSeverityOverrides.LoadFromFile(
+                    options.RulesFile,
+                    RuleCatalog.KnownRuleIds,
+                    warn));
+            }
+        }
+
+        return layers.Count == 0
+            ? RuleSeverityOverrides.Empty
+            : RuleSeverityOverrides.Merge([.. layers]);
+    }
+
+    static int RunRulesSubcommand(string[] args)
+    {
+        if (args.Length == 0 || string.Equals(args[0], "list", StringComparison.OrdinalIgnoreCase))
+        {
+            return PrintRulesList(args.Skip(1).ToArray());
+        }
+
+        AnsiConsole.MarkupLine($"[red]Error:[/] Unknown rules subcommand: {Markup.Escape(args[0])}");
+        AnsiConsole.MarkupLine("Available: [cyan]rules list[/]");
+        return 1;
+    }
+
+    static int PrintRulesList(string[] args)
+    {
+        string? rulesFile = null;
+        for (int i = 0; i < args.Length; i++)
+        {
+            if (args[i] == "--rules" && i + 1 < args.Length)
+                rulesFile = args[++i];
+        }
+
+        var layers = new List<RuleSeverityOverrides>();
+        Action<string> warn = msg => AnsiConsole.MarkupLine($"[yellow]Warning:[/] {Markup.Escape(msg)}");
+
+        if (File.Exists(RuleSeverityOverrides.DefaultUserPath))
+        {
+            layers.Add(RuleSeverityOverrides.LoadFromFile(
+                RuleSeverityOverrides.DefaultUserPath, RuleCatalog.KnownRuleIds, warn));
+        }
+        if (!string.IsNullOrEmpty(rulesFile) && File.Exists(rulesFile))
+        {
+            layers.Add(RuleSeverityOverrides.LoadFromFile(
+                rulesFile, RuleCatalog.KnownRuleIds, warn));
+        }
+
+        var effective = layers.Count == 0
+            ? RuleSeverityOverrides.Empty
+            : RuleSeverityOverrides.Merge([.. layers]);
+
+        AnsiConsole.WriteLine();
+        var defaultPath = RuleSeverityOverrides.DefaultUserPath;
+        AnsiConsole.MarkupLine($"[grey]User rules file:[/] [link]{Markup.Escape(defaultPath)}[/] " +
+            (File.Exists(defaultPath) ? "[green](found)[/]" : "[grey](not present)[/]"));
+        if (!string.IsNullOrEmpty(rulesFile))
+        {
+            AnsiConsole.MarkupLine($"[grey]Extra rules file:[/] [link]{Markup.Escape(rulesFile)}[/] " +
+                (File.Exists(rulesFile) ? "[green](found)[/]" : "[red](not found)[/]"));
+        }
+        AnsiConsole.WriteLine();
+
+        var table = new Table()
+            .Border(TableBorder.Rounded)
+            .BorderColor(Color.Grey)
+            .AddColumn(new TableColumn("[grey]Rule ID[/]").NoWrap())
+            .AddColumn(new TableColumn("[grey]Category[/]").NoWrap())
+            .AddColumn(new TableColumn("[grey]Default[/]").NoWrap())
+            .AddColumn(new TableColumn("[grey]Effective[/]").NoWrap())
+            .AddColumn(new TableColumn("[grey]Source[/]").NoWrap())
+            .AddColumn("[grey]Description[/]");
+
+        foreach (var entry in RuleCatalog.All)
+        {
+            var defaultSev = entry.DefaultSeverity;
+            var effectiveSev = effective.Resolve(entry.RuleId, defaultSev);
+            var source = effective.Sources.TryGetValue(entry.RuleId, out var s)
+                ? Path.GetFileName(s)
+                : "built-in";
+            var rowStyle = effectiveSev == defaultSev ? string.Empty : "yellow ";
+
+            table.AddRow(
+                $"[{rowStyle}cyan]{Markup.Escape(entry.RuleId)}[/]",
+                Markup.Escape(entry.Category.ToString()),
+                FormatSeverityCell(defaultSev),
+                FormatSeverityCell(effectiveSev),
+                Markup.Escape(source),
+                Markup.Escape(entry.Description));
+        }
+
+        AnsiConsole.Write(table);
+        AnsiConsole.WriteLine();
+
+        AnsiConsole.MarkupLine("[grey]To customize, create the user rules file with JSON like:[/]");
+        AnsiConsole.MarkupLine("  [cyan]{[/]");
+        AnsiConsole.MarkupLine("    [cyan]\"trust.fullTrust\": \"Info\",[/]");
+        AnsiConsole.MarkupLine("    [cyan]\"services.windowsService\": \"Warning\"[/]");
+        AnsiConsole.MarkupLine("  [cyan]}[/]");
+        AnsiConsole.WriteLine();
+
+        return 0;
+    }
+
+    static string FormatSeverityCell(FindingSeverity severity) => severity switch
+    {
+        FindingSeverity.Critical => "[red bold]Critical[/]",
+        FindingSeverity.Warning => "[yellow bold]Warning[/]",
+        FindingSeverity.Review => "[cyan]Review[/]",
+        _ => "[grey]Info[/]"
+    };
+
     static int AnalyzeBundle(string filePath, CliOptions options)
     {
         int worstExit = 0;
@@ -87,7 +230,7 @@ static class Program
                 AnsiConsole.WriteLine();
                 AnsiConsole.Write(new Rule($"[cyan]{Markup.Escape(pkg.Label)}[/] [grey]({pkg.Info.Architecture})[/]").LeftJustified());
 
-                var findings = RulesEngine.Analyze(pkg.Manifest);
+                var findings = RulesEngine.Analyze(pkg.Manifest, options.Overrides);
                 pkg.Info.CriticalCount = findings.Count(f => f.Severity == FindingSeverity.Critical);
                 pkg.Info.WarningCount = findings.Count(f => f.Severity == FindingSeverity.Warning);
                 pkg.Info.ReviewCount = findings.Count(f => f.Severity == FindingSeverity.Review);
@@ -156,7 +299,7 @@ static class Program
 
                     ctx.Status("Running rules engine...");
                     Thread.Sleep(80);
-                    var f = RulesEngine.Analyze(doc);
+                    var f = RulesEngine.Analyze(doc, options.Overrides);
 
                     ctx.Status("Generating report...");
                     Thread.Sleep(80);
@@ -381,6 +524,10 @@ static class Program
                     if (i + 1 < args.Length && Enum.TryParse<FindingSeverity>(args[++i], true, out var sev))
                         options.MinSeverity = sev;
                     break;
+                case "--rules":
+                    if (i + 1 < args.Length)
+                        options.RulesFile = args[++i];
+                    break;
                 case "--output" or "-o":
                     if (i + 1 < args.Length)
                         options.OutputFile = args[++i];
@@ -420,6 +567,11 @@ static class Program
         table.AddRow("[cyan bold]Filtering:[/]", "");
         table.AddRow("  [grey]--severity <level>[/]", "Minimum severity: info, review, warning, critical");
         table.AddRow("", "");
+        table.AddRow("[cyan bold]Rule customization:[/]", "");
+        table.AddRow("  [grey]--rules <file>[/]", "Override per-rule severities from a JSON file");
+        table.AddRow("  msixplainer rules list", "Show all rule IDs and their default/effective severity");
+        table.AddRow("", $"[grey]Auto-loaded:[/] {Markup.Escape(RuleSeverityOverrides.DefaultUserPath)}");
+        table.AddRow("", "");
         table.AddRow("[cyan bold]Exit codes:[/]", "");
         table.AddRow("  [green]0[/]", "No warnings or critical findings");
         table.AddRow("  [yellow]1[/]", "One or more warnings");
@@ -444,6 +596,8 @@ sealed class CliOptions
     public OutputFormat Format { get; set; } = OutputFormat.Console;
     public FindingSeverity? MinSeverity { get; set; }
     public string? OutputFile { get; set; }
+    public string? RulesFile { get; set; }
+    public RuleSeverityOverrides Overrides { get; set; } = RuleSeverityOverrides.Empty;
 
     public bool IsValid => UseSample || FilePaths.Count > 0;
 }

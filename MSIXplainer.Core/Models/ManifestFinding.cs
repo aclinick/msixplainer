@@ -30,8 +30,9 @@ public enum FindingCategory
 
 public sealed class ManifestFinding
 {
+    public string RuleId { get; init; } = string.Empty;
     public required FindingCategory Category { get; init; }
-    public required FindingSeverity Severity { get; init; }
+    public required FindingSeverity Severity { get; set; }
     public required string Title { get; init; }
     public required string Description { get; init; }
     public required string WhyItMatters { get; init; }

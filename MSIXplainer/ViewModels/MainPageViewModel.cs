@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Xml.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -210,7 +211,7 @@ public partial class MainPageViewModel : ObservableObject
         RawXml = rawXml;
         _manifestRoot = manifest.Root!;
 
-        _allFindings = RulesEngine.Analyze(manifest);
+        _allFindings = RulesEngine.Analyze(manifest, LoadUserRuleOverrides());
 
         info.CriticalCount = _allFindings.Count(f => f.Severity == FindingSeverity.Critical);
         info.WarningCount = _allFindings.Count(f => f.Severity == FindingSeverity.Warning);
@@ -223,6 +224,23 @@ public partial class MainPageViewModel : ObservableObject
         BuildSections();
         ComputeAssessment(info);
         SectionsRebuilt?.Invoke();
+    }
+
+    private static RuleSeverityOverrides LoadUserRuleOverrides()
+    {
+        try
+        {
+            return File.Exists(RuleSeverityOverrides.DefaultUserPath)
+                ? RuleSeverityOverrides.LoadFromFile(
+                    RuleSeverityOverrides.DefaultUserPath,
+                    RuleCatalog.KnownRuleIds,
+                    warn: null)
+                : RuleSeverityOverrides.Empty;
+        }
+        catch
+        {
+            return RuleSeverityOverrides.Empty;
+        }
     }
 
     private void BuildSections()

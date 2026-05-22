@@ -45,13 +45,13 @@ Three-project .NET 10 solution (`MSIXplainer.slnx`):
 All analysis flows through the same Core services in this order:
 
 1. **`ManifestParserService`** — Extracts `AppxManifest.xml` from `.msix`/`.appx` ZIP archives (and `.msixbundle`/`.appxbundle` ZIP-of-ZIP archives) with security guards (DTD prohibited, XML resolver null, 10 MB cap, no code execution).
-2. **`RulesEngine.Analyze(XDocument)`** — Static `Analyze` method runs 18 deterministic rule methods against manifest XML, returns `List<ManifestFinding>` sorted by severity then category. Each finding has `Category`, `Severity`, `Title`, `Description`, `WhyItMatters`, `Recommendation`, and optional `XmlSnippet`.
+2. **`RulesEngine.Analyze(XDocument, RuleSeverityOverrides?)`** — Static `Analyze` method runs 18 deterministic rule methods against manifest XML, returns `List<ManifestFinding>` sorted by severity then category. Each finding has a stable `RuleId`, plus `Category`, `Severity`, `Title`, `Description`, `WhyItMatters`, `Recommendation`, and optional `XmlSnippet`. The optional `RuleSeverityOverrides` parameter is applied post-emission and only changes severity — rule text remains compiled in.
 3. **`ManifestExplainerService`** — Builds section-by-section `ManifestSection` + `ManifestPropertyGroup` structures with plain-English explanations of every XML element.
 4. **`ExportService`** — Generates annotated Markdown reports and structured JSON from findings.
 
 ### Adding a new analysis rule
 
-Add a private `Analyze*` method in `RulesEngine.cs` and call it from `Analyze()`. Each rule method receives `(XElement root, List<ManifestFinding> findings)` and appends findings. Use `FindingSeverity` (Critical/Warning/Review/Info) and `FindingCategory` enum values. If adding a new category, update `FindingCategory` and `ManifestFinding.CategoryLabel` in the Models, and add a section entry in `ManifestExplainerService.BuildSections`.
+Add a private `Analyze*` method in `RulesEngine.cs` and call it from `Analyze()`. Each rule method receives `(XElement root, List<ManifestFinding> findings)` and appends findings. **Every emitted finding must set a stable `RuleId`** (e.g. `trust.allowElevation`, `virt.filesystemDisabled`) so users can override its severity via `%LOCALAPPDATA%\MSIXplainer\rules.json`. For each new `RuleId`, also add a matching entry to `RuleCatalog.All` in `MSIXplainer.Core/Services/RuleCatalog.cs` — the `EveryRuleEmittedBySample_HasCatalogEntry` test will fail if you forget. Use `FindingSeverity` (Critical/Warning/Review/Info) and `FindingCategory` enum values. If adding a new category, update `FindingCategory` and `ManifestFinding.CategoryLabel` in the Models, and add a section entry in `ManifestExplainerService.BuildSections`.
 
 ## Workflow
 

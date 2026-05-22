@@ -21,7 +21,12 @@ public static class RulesEngine
     private static readonly XNamespace Com = "http://schemas.microsoft.com/appx/manifest/com/windows10";
 
     public static List<ManifestFinding> Analyze(XDocument manifest)
+        => Analyze(manifest, RuleSeverityOverrides.Empty);
+
+    public static List<ManifestFinding> Analyze(XDocument manifest, RuleSeverityOverrides? overrides)
     {
+        overrides ??= RuleSeverityOverrides.Empty;
+
         var findings = new List<ManifestFinding>();
         var root = manifest.Root!;
 
@@ -44,6 +49,14 @@ public static class RulesEngine
         AnalyzeServices(root, findings);
         AnalyzeAllowElevation(root, findings);
 
+        foreach (var f in findings)
+        {
+            if (!string.IsNullOrEmpty(f.RuleId))
+            {
+                f.Severity = overrides.Resolve(f.RuleId, f.Severity);
+            }
+        }
+
         return findings
             .OrderByDescending(f => f.Severity)
             .ThenBy(f => f.Category)
@@ -61,6 +74,7 @@ public static class RulesEngine
 
         findings.Add(new ManifestFinding
         {
+            RuleId = "identity.package",
             Category = FindingCategory.Identity,
             Severity = FindingSeverity.Info,
             Title = "Package Identity",
@@ -75,6 +89,7 @@ public static class RulesEngine
         {
             findings.Add(new ManifestFinding
             {
+                RuleId = "identity.simplePublisher",
                 Category = FindingCategory.Identity,
                 Severity = FindingSeverity.Review,
                 Title = "Self-signed or simple publisher certificate",
@@ -94,6 +109,7 @@ public static class RulesEngine
         {
             findings.Add(new ManifestFinding
             {
+                RuleId = "trust.fullTrust",
                 Category = FindingCategory.Trust,
                 Severity = FindingSeverity.Info,
                 Title = "Runs with Full Trust",
@@ -107,6 +123,7 @@ public static class RulesEngine
         {
             findings.Add(new ManifestFinding
             {
+                RuleId = "trust.appContainer",
                 Category = FindingCategory.Trust,
                 Severity = FindingSeverity.Info,
                 Title = "Runs in AppContainer sandbox",
@@ -125,6 +142,7 @@ public static class RulesEngine
         {
             findings.Add(new ManifestFinding
             {
+                RuleId = "trust.allowElevation",
                 Category = FindingCategory.Trust,
                 Severity = FindingSeverity.Warning,
                 Title = "Can request Admin elevation (UAC)",
@@ -229,6 +247,7 @@ public static class RulesEngine
             {
                 findings.Add(new ManifestFinding
                 {
+                    RuleId = $"capability.{cap}",
                     Category = FindingCategory.Capabilities,
                     Severity = info.Severity,
                     Title = $"Restricted capability: {cap}",
@@ -251,6 +270,7 @@ public static class RulesEngine
         {
             findings.Add(new ManifestFinding
             {
+                RuleId = "capability.unknownRestricted",
                 Category = FindingCategory.Capabilities,
                 Severity = FindingSeverity.Review,
                 Title = $"Restricted capability: {cap}",
@@ -286,6 +306,7 @@ public static class RulesEngine
                 var severity = cap == "internetClient" ? FindingSeverity.Info : FindingSeverity.Review;
                 findings.Add(new ManifestFinding
                 {
+                    RuleId = $"network.{cap}",
                     Category = FindingCategory.NetworkAccess,
                     Severity = severity,
                     Title = $"Network: {cap}",
@@ -351,6 +372,7 @@ public static class RulesEngine
             {
                 findings.Add(new ManifestFinding
                 {
+                    RuleId = $"device.{cap}",
                     Category = FindingCategory.DeviceAccess,
                     Severity = info.Severity,
                     Title = $"Device access: {cap}",
@@ -364,6 +386,7 @@ public static class RulesEngine
             {
                 findings.Add(new ManifestFinding
                 {
+                    RuleId = "device.unknown",
                     Category = FindingCategory.DeviceAccess,
                     Severity = FindingSeverity.Review,
                     Title = $"Device access: {cap}",
@@ -385,6 +408,7 @@ public static class RulesEngine
         {
             findings.Add(new ManifestFinding
             {
+                RuleId = "network.vpnPlugin",
                 Category = FindingCategory.NetworkAccess,
                 Severity = FindingSeverity.Critical,
                 Title = "VPN plug-in registration",
@@ -410,6 +434,7 @@ public static class RulesEngine
 
             findings.Add(new ManifestFinding
             {
+                RuleId = "startup.task",
                 Category = FindingCategory.Startup,
                 Severity = FindingSeverity.Info,
                 Title = $"Auto-starts at login: {taskId}",
@@ -431,6 +456,7 @@ public static class RulesEngine
             var name = proto.Attribute("Name")?.Value ?? "unknown";
             findings.Add(new ManifestFinding
             {
+                RuleId = "protocols.handler",
                 Category = FindingCategory.Protocols,
                 Severity = FindingSeverity.Review,
                 Title = $"Protocol handler: {name}://",
@@ -457,6 +483,7 @@ public static class RulesEngine
             var hostList = string.Join(", ", hosts);
             findings.Add(new ManifestFinding
             {
+                RuleId = "protocols.appUri",
                 Category = FindingCategory.Protocols,
                 Severity = FindingSeverity.Review,
                 Title = $"App URI handler: {hostList}",
@@ -484,6 +511,7 @@ public static class RulesEngine
             var typeList = types.Count > 0 ? string.Join(", ", types) : "none listed";
             findings.Add(new ManifestFinding
             {
+                RuleId = "fileAssoc.handler",
                 Category = FindingCategory.FileAssociations,
                 Severity = FindingSeverity.Info,
                 Title = $"File association: {typeList}",
@@ -507,6 +535,7 @@ public static class RulesEngine
             {
                 findings.Add(new ManifestFinding
                 {
+                    RuleId = "virt.filesystemDisabled",
                     Category = FindingCategory.Virtualization,
                     Severity = FindingSeverity.Critical,
                     Title = "Filesystem virtualization DISABLED",
@@ -528,6 +557,7 @@ public static class RulesEngine
             {
                 findings.Add(new ManifestFinding
                 {
+                    RuleId = "virt.registryDisabled",
                     Category = FindingCategory.Virtualization,
                     Severity = FindingSeverity.Critical,
                     Title = "Registry virtualization DISABLED",
@@ -556,6 +586,7 @@ public static class RulesEngine
 
             findings.Add(new ManifestFinding
             {
+                RuleId = "com.outProcServer",
                 Category = FindingCategory.COM,
                 Severity = FindingSeverity.Review,
                 Title = $"COM server registration ({clsids.Count} class{(clsids.Count != 1 ? "es" : "")})",
@@ -574,6 +605,7 @@ public static class RulesEngine
         {
             findings.Add(new ManifestFinding
             {
+                RuleId = "com.inProcServer",
                 Category = FindingCategory.COM,
                 Severity = FindingSeverity.Info,
                 Title = "In-process COM server (shell extension)",
@@ -598,6 +630,7 @@ public static class RulesEngine
             var types = string.Join(", ", taskTypes);
             findings.Add(new ManifestFinding
             {
+                RuleId = "background.task",
                 Category = FindingCategory.BackgroundTasks,
                 Severity = FindingSeverity.Review,
                 Title = $"Background task: {(string.IsNullOrEmpty(types) ? "general" : types)}",
@@ -618,6 +651,7 @@ public static class RulesEngine
         {
             findings.Add(new ManifestFinding
             {
+                RuleId = "office.integration",
                 Category = FindingCategory.OfficeIntegration,
                 Severity = FindingSeverity.Review,
                 Title = "Office/Outlook integration detected",
@@ -638,6 +672,7 @@ public static class RulesEngine
         {
             findings.Add(new ManifestFinding
             {
+                RuleId = "office.extension",
                 Category = FindingCategory.OfficeIntegration,
                 Severity = FindingSeverity.Review,
                 Title = $"Office extension: {ext.Attribute("Category")?.Value}",
@@ -665,6 +700,7 @@ public static class RulesEngine
         {
             findings.Add(new ManifestFinding
             {
+                RuleId = "webview2.dependency",
                 Category = FindingCategory.WebView2,
                 Severity = FindingSeverity.Info,
                 Title = "WebView2 runtime dependency",
@@ -685,6 +721,7 @@ public static class RulesEngine
         {
             findings.Add(new ManifestFinding
             {
+                RuleId = "vdi.perUserInstall",
                 Category = FindingCategory.VDI,
                 Severity = FindingSeverity.Info,
                 Title = "Per-user installation support",
@@ -699,6 +736,7 @@ public static class RulesEngine
         {
             findings.Add(new ManifestFinding
             {
+                RuleId = "vdi.externalContent",
                 Category = FindingCategory.VDI,
                 Severity = FindingSeverity.Review,
                 Title = "Allows external content",
@@ -725,6 +763,7 @@ public static class RulesEngine
 
             findings.Add(new ManifestFinding
             {
+                RuleId = "services.windowsService",
                 Category = FindingCategory.Services,
                 Severity = FindingSeverity.Critical,
                 Title = $"Windows service: {name}",
