@@ -12,7 +12,7 @@
   <Identity
     Name="46554Paymynanny.com.MSIXplainer"
     Publisher="CN=719329FB-9634-4D88-B827-2EC302E15BD0"
-    Version="1.0.6.0" />
+    Version="1.0.8.0" />
 
   <mp:PhoneIdentity PhoneProductId="3a09e9f9-55b1-418a-9e63-9a662f1a29bc" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
 
