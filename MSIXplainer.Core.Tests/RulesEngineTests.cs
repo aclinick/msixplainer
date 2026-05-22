@@ -54,7 +54,7 @@ public class RulesEngineTests
         var findings = AnalyzeSample();
         var fullTrust = findings.First(f => f.Title == "Runs with Full Trust");
 
-        Assert.Equal(FindingSeverity.Critical, fullTrust.Severity);
+        Assert.Equal(FindingSeverity.Info, fullTrust.Severity);
         Assert.Equal(FindingCategory.Trust, fullTrust.Category);
     }
 
@@ -86,7 +86,7 @@ public class RulesEngineTests
         var bfsa = findings.First(f =>
             f.Title == "Restricted capability: broadFileSystemAccess");
 
-        Assert.Equal(FindingSeverity.Critical, bfsa.Severity);
+        Assert.Equal(FindingSeverity.Warning, bfsa.Severity);
         Assert.Equal(FindingCategory.Capabilities, bfsa.Category);
     }
 
@@ -97,7 +97,7 @@ public class RulesEngineTests
         var diag = findings.First(f =>
             f.Title == "Restricted capability: appDiagnostics");
 
-        Assert.Equal(FindingSeverity.Warning, diag.Severity);
+        Assert.Equal(FindingSeverity.Info, diag.Severity);
     }
 
     // ── Device Capabilities ──
@@ -133,7 +133,7 @@ public class RulesEngineTests
         var findings = AnalyzeSample();
         var startup = findings.First(f => f.Category == FindingCategory.Startup);
 
-        Assert.Equal(FindingSeverity.Warning, startup.Severity);
+        Assert.Equal(FindingSeverity.Info, startup.Severity);
         Assert.Contains("ContosoHubStartup", startup.Description);
     }
 
@@ -167,7 +167,7 @@ public class RulesEngineTests
         var virt = findings.Where(f => f.Category == FindingCategory.Virtualization).ToList();
 
         Assert.True(virt.Count >= 2, "Should detect both filesystem and registry virtualization disabled");
-        Assert.All(virt, f => Assert.Equal(FindingSeverity.Warning, f.Severity));
+        Assert.All(virt, f => Assert.Equal(FindingSeverity.Critical, f.Severity));
     }
 
     // ── COM Registrations ──
@@ -267,10 +267,12 @@ public class RulesEngineTests
     {
         var findings = AnalyzeSample();
 
+        // Sample manifest disables filesystem and registry virtualization, which
+        // produces 2 Critical findings under the recalibrated severity model.
         Assert.True(findings.Count(f => f.Severity == FindingSeverity.Critical) >= 2,
-            "Sample should have at least 2 critical findings (runFullTrust + broadFileSystemAccess)");
-        Assert.True(findings.Count(f => f.Severity == FindingSeverity.Warning) >= 4,
-            "Sample should have multiple warning findings");
+            "Sample should have at least 2 critical findings (filesystem + registry virtualization disabled)");
+        Assert.True(findings.Count(f => f.Severity == FindingSeverity.Warning) >= 1,
+            "Sample should have at least one warning finding");
         Assert.True(findings.Count > 10,
             "Sample manifest should produce many findings");
     }

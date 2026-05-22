@@ -95,11 +95,11 @@ public static class RulesEngine
             findings.Add(new ManifestFinding
             {
                 Category = FindingCategory.Trust,
-                Severity = FindingSeverity.Critical,
+                Severity = FindingSeverity.Info,
                 Title = "Runs with Full Trust",
-                Description = "This application runs with full trust permissions, meaning it has the same access as a traditional desktop application — it can access the full filesystem, registry, and system APIs.",
-                WhyItMatters = "Full trust apps are NOT sandboxed. They can read/write any file the user can access, modify the registry, launch other processes, and interact with the network freely. The MSIX container provides some virtualization, but the app can potentially bypass it.",
-                Recommendation = "This is common for desktop bridge (Win32) apps packaged as MSIX. Review other findings to understand exactly what the app accesses. Consider if AppContainer isolation would be more appropriate.",
+                Description = "This application declares the runFullTrust capability. It runs with the same permissions as a traditional desktop (Win32) application — outside the AppContainer sandbox.",
+                WhyItMatters = "This is the normal configuration for desktop apps packaged as MSIX (the \"desktop bridge\"). The vast majority of line-of-business and productivity apps use full trust. By itself, this is expected and not a concern — the meaningful signal is in the specific capabilities, extensions, and file/registry virtualization findings below.",
+                Recommendation = "Review the other Trust and Capabilities findings to understand the app's actual surface area. The presence of full trust alone is normal for a desktop app.",
                 XmlSnippet = "<rescap:Capability Name=\"runFullTrust\" />"
             });
         }
@@ -111,7 +111,7 @@ public static class RulesEngine
                 Severity = FindingSeverity.Info,
                 Title = "Runs in AppContainer sandbox",
                 Description = "This application runs inside the AppContainer sandbox with limited permissions. It can only access resources explicitly granted through declared capabilities.",
-                WhyItMatters = "Sandboxed apps are safer by default. They cannot access arbitrary files, registry keys, or system resources unless the manifest explicitly requests them.",
+                WhyItMatters = "Sandboxed apps are safer by default. They cannot access arbitrary files, registry keys, or system resources unless the manifest explicitly requests them. This is uncommon for desktop-bridge MSIX packages — most repackaged Win32 apps require full trust — so seeing AppContainer here is a positive sign.",
                 Recommendation = "Good security posture. Review the declared capabilities to ensure they are appropriate.",
                 XmlSnippet = "<!-- No runFullTrust capability declared -->"
             });
@@ -126,7 +126,7 @@ public static class RulesEngine
             findings.Add(new ManifestFinding
             {
                 Category = FindingCategory.Trust,
-                Severity = FindingSeverity.Critical,
+                Severity = FindingSeverity.Warning,
                 Title = "Can request Admin elevation (UAC)",
                 Description = "This application declares the allowElevation capability, meaning it can prompt for administrator privileges via UAC.",
                 WhyItMatters = "An elevated app has full system-level access — it can modify protected system files, install drivers, change security settings, and access other users' data. This is the highest privilege level on Windows.",
@@ -142,12 +142,12 @@ public static class RulesEngine
 
         var restrictedCapabilities = new Dictionary<string, (FindingSeverity Severity, string Description, string WhyItMatters, string Recommendation)>
         {
-            ["broadFileSystemAccess"] = (FindingSeverity.Critical,
+            ["broadFileSystemAccess"] = (FindingSeverity.Warning,
                 "Can access the entire user filesystem including Documents, Desktop, Downloads, and other personal folders.",
                 "This grants read/write access well beyond the app's own data. The app can read sensitive documents, modify files in any user-accessible location, or exfiltrate data.",
                 "Verify the app genuinely needs broad file access. Most apps should use specific folder pickers instead. Check if the vendor explains why this capability is needed."),
 
-            ["appCaptureSettings"] = (FindingSeverity.Warning,
+            ["appCaptureSettings"] = (FindingSeverity.Info,
                 "Can access screen capture settings and potentially initiate screen recordings.",
                 "Screen capture can expose sensitive information displayed on screen, including passwords, confidential documents, and private communications.",
                 "Verify this is expected behavior for the app type (e.g., screen sharing, recording tools)."),
@@ -157,22 +157,22 @@ public static class RulesEngine
                 "This capability allows the app to modify what software is installed. A compromised app could install malware or remove security tools.",
                 "This is very unusual for most apps. Verify the vendor and use case. Only deployment and management tools should need this."),
 
-            ["appDiagnostics"] = (FindingSeverity.Warning,
+            ["appDiagnostics"] = (FindingSeverity.Info,
                 "Can access diagnostic information about other running apps, including process name, memory usage, and CPU time.",
                 "This allows the app to survey what other software is running on the system, which could be used for reconnaissance.",
                 "Typically needed by system monitoring or diagnostic tools. Verify this matches the app's purpose."),
 
-            ["appointmentsSystem"] = (FindingSeverity.Warning,
+            ["appointmentsSystem"] = (FindingSeverity.Info,
                 "Can read, create, and modify calendar appointments in the system calendar.",
                 "Calendar data often contains sensitive meeting details, attendee lists, and location information.",
                 "Expected for calendar and productivity apps. Verify the app needs calendar integration."),
 
-            ["contactsSystem"] = (FindingSeverity.Warning,
+            ["contactsSystem"] = (FindingSeverity.Info,
                 "Can read and modify the system contacts database.",
                 "Contact data contains personally identifiable information (PII) including names, emails, phone numbers, and addresses.",
                 "Expected for communication and CRM apps. Verify the app needs contact access."),
 
-            ["documentsLibrary"] = (FindingSeverity.Warning,
+            ["documentsLibrary"] = (FindingSeverity.Info,
                 "Can access the user's Documents library directly without a file picker prompt.",
                 "Unlike broadFileSystemAccess, this is scoped to Documents only, but still provides silent access without user consent per file.",
                 "Verify the app needs direct document access. File picker-based access is safer as the user explicitly selects files."),
@@ -192,7 +192,7 @@ public static class RulesEngine
                 "Music library access is lower risk but still provides direct filesystem access without per-file user consent.",
                 "Expected for music players and audio apps."),
 
-            ["removableStorage"] = (FindingSeverity.Warning,
+            ["removableStorage"] = (FindingSeverity.Info,
                 "Can access files on removable storage devices (USB drives, SD cards) directly.",
                 "Removable media may contain sensitive files. The app can also write to removable storage, which could be used for data exfiltration.",
                 "Verify the app needs direct removable storage access. Consider if file picker access would suffice."),
@@ -212,7 +212,7 @@ public static class RulesEngine
                 "Task data may contain personal and work-related action items.",
                 "Expected for productivity and task management apps."),
 
-            ["smsSend"] = (FindingSeverity.Warning,
+            ["smsSend"] = (FindingSeverity.Info,
                 "Can send SMS messages from the device.",
                 "SMS sending could be used for premium-rate messaging or for sending data to external services without user awareness.",
                 "Unusual for most desktop apps. Verify this capability matches the app's purpose."),
@@ -304,10 +304,10 @@ public static class RulesEngine
     {
         var deviceCaps = new Dictionary<string, (FindingSeverity Severity, string Description, string WhyItMatters)>
         {
-            ["microphone"] = (FindingSeverity.Warning,
+            ["microphone"] = (FindingSeverity.Info,
                 "Can access the device microphone for audio recording.",
                 "Microphone access enables audio surveillance if the app is compromised. Verify the app legitimately needs audio input."),
-            ["webcam"] = (FindingSeverity.Warning,
+            ["webcam"] = (FindingSeverity.Info,
                 "Can access the device camera for photo/video capture.",
                 "Camera access enables visual surveillance. Verify the app needs camera functionality."),
             ["location"] = (FindingSeverity.Review,
@@ -319,10 +319,10 @@ public static class RulesEngine
             ["bluetooth"] = (FindingSeverity.Review,
                 "Can access Bluetooth functionality to communicate with nearby devices.",
                 "Bluetooth can be used to discover and communicate with nearby devices, peripherals, and beacons."),
-            ["serialCommunication"] = (FindingSeverity.Warning,
+            ["serialCommunication"] = (FindingSeverity.Info,
                 "Can access serial (COM) ports for hardware communication.",
                 "Serial port access allows direct communication with connected hardware, which could include industrial control systems."),
-            ["usb"] = (FindingSeverity.Warning,
+            ["usb"] = (FindingSeverity.Info,
                 "Can access USB devices beyond standard HID peripherals.",
                 "Direct USB access can interact with specialized hardware and could potentially access or modify connected storage."),
             ["humanInterfaceDevice"] = (FindingSeverity.Review,
@@ -331,7 +331,7 @@ public static class RulesEngine
             ["pointOfService"] = (FindingSeverity.Review,
                 "Can access point-of-service devices (barcode scanners, receipt printers).",
                 "Point-of-service access is typical for retail and logistics applications."),
-            ["lowLevelDevices"] = (FindingSeverity.Warning,
+            ["lowLevelDevices"] = (FindingSeverity.Info,
                 "Can access low-level hardware buses (I2C, SPI, GPIO).",
                 "Low-level hardware access provides direct control over system buses, which is powerful and potentially dangerous on shared machines."),
             ["gazeInput"] = (FindingSeverity.Review,
@@ -386,7 +386,7 @@ public static class RulesEngine
             findings.Add(new ManifestFinding
             {
                 Category = FindingCategory.NetworkAccess,
-                Severity = FindingSeverity.Warning,
+                Severity = FindingSeverity.Critical,
                 Title = "VPN plug-in registration",
                 Description = "This app registers as a VPN plug-in, which allows it to create virtual network interfaces and route network traffic.",
                 WhyItMatters = "A VPN plug-in can intercept, inspect, and modify all network traffic on the device. This is extremely powerful and should only be granted to trusted VPN providers.",
@@ -411,7 +411,7 @@ public static class RulesEngine
             findings.Add(new ManifestFinding
             {
                 Category = FindingCategory.Startup,
-                Severity = FindingSeverity.Warning,
+                Severity = FindingSeverity.Info,
                 Title = $"Auto-starts at login: {taskId}",
                 Description = $"This app registers a startup task (ID: \"{taskId}\") that launches automatically when the user signs in. Default enabled: {enabled}.",
                 WhyItMatters = "Startup tasks increase login time, consume system resources, and maintain a persistent presence on the machine. Multiple startup tasks compound this effect across all installed apps.",
@@ -508,7 +508,7 @@ public static class RulesEngine
                 findings.Add(new ManifestFinding
                 {
                     Category = FindingCategory.Virtualization,
-                    Severity = FindingSeverity.Warning,
+                    Severity = FindingSeverity.Critical,
                     Title = "Filesystem virtualization DISABLED",
                     Description = "This app disables MSIX filesystem write virtualization. File writes go directly to the real filesystem instead of being redirected to the app's virtual container.",
                     WhyItMatters = "Filesystem virtualization is a key MSIX isolation feature. When disabled, the app's file writes persist after uninstall and could modify system or user files directly.",
@@ -529,7 +529,7 @@ public static class RulesEngine
                 findings.Add(new ManifestFinding
                 {
                     Category = FindingCategory.Virtualization,
-                    Severity = FindingSeverity.Warning,
+                    Severity = FindingSeverity.Critical,
                     Title = "Registry virtualization DISABLED",
                     Description = "This app disables MSIX registry write virtualization. Registry writes go directly to the real registry instead of being redirected to the app's virtual hive.",
                     WhyItMatters = "Registry virtualization prevents apps from modifying the real registry. When disabled, the app can write persistent registry keys that survive uninstallation.",
@@ -575,7 +575,7 @@ public static class RulesEngine
             findings.Add(new ManifestFinding
             {
                 Category = FindingCategory.COM,
-                Severity = FindingSeverity.Warning,
+                Severity = FindingSeverity.Info,
                 Title = "In-process COM server (shell extension)",
                 Description = "This app registers in-process COM servers that load as DLLs inside other processes (like Explorer). This is commonly used for shell extensions, context menu handlers, or thumbnail providers.",
                 WhyItMatters = "In-process servers run inside the host process's address space. A buggy or malicious in-process server could crash Explorer or other host processes, and has full access to the host process's memory.",
@@ -726,7 +726,7 @@ public static class RulesEngine
             findings.Add(new ManifestFinding
             {
                 Category = FindingCategory.Services,
-                Severity = FindingSeverity.Warning,
+                Severity = FindingSeverity.Critical,
                 Title = $"Windows service: {name}",
                 Description = $"This app installs a Windows service named \"{name}\" that runs in the background as a system-level process.",
                 WhyItMatters = "Windows services run independently of user sessions, often with elevated privileges, and persist across reboots. They are a significant trust decision.",
