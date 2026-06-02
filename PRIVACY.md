@@ -1,3 +1,8 @@
+---
+permalink: /privacy/
+title: MSIXplainer Privacy Policy
+---
+
 # Privacy Policy
 
 **Last updated:** June 2, 2026
