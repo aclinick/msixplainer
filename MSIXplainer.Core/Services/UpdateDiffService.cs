@@ -169,6 +169,12 @@ public static class UpdateDiffService
         int totalBlocks = 0;
         int reusedBlocks = 0;
 
+        long addedUncompressed = 0;
+        long removedUncompressed = 0;
+        long changedNetSize = 0;
+        long unchangedUncompressed = 0;
+        long newPackageUncompressed = 0;
+
         foreach (var newFile in newFiles)
         {
             oldByPath.TryGetValue(newFile.Name, out var oldFile);
@@ -213,6 +219,20 @@ public static class UpdateDiffService
             deltaPayloadBytes += fileDelta;
             totalBlocks += newFile.Blocks.Count;
             reusedBlocks += fileReused;
+            newPackageUncompressed += newFile.UncompressedSize;
+
+            switch (status)
+            {
+                case FileDiffStatus.Added:
+                    addedUncompressed += newFile.UncompressedSize;
+                    break;
+                case FileDiffStatus.Modified:
+                    changedNetSize += newFile.UncompressedSize - (oldFile?.UncompressedSize ?? 0);
+                    break;
+                case FileDiffStatus.Unchanged:
+                    unchangedUncompressed += newFile.UncompressedSize;
+                    break;
+            }
         }
 
         // Files removed in new: nothing to download for them, but surface in the UI.
@@ -231,15 +251,22 @@ public static class UpdateDiffService
                     TotalBlocks = 0,
                     ReusedBlocks = 0
                 });
+                removedUncompressed += oldFile.UncompressedSize;
             }
         }
 
-        long delta = deltaPayloadBytes + overheadBytes;
+        long oldPackageUncompressed = oldFiles.Sum(f => f.UncompressedSize);
+
+        // Delta = pure block-delta payload, matching SDK comparepackage.exe `UpdateImpact`.
+        // Metadata overhead is kept SEPARATE; renderers add them for "real wire bytes".
+        long delta = deltaPayloadBytes;
         long full = fullDownloadBytesOverride ?? (fullPayloadBytes + overheadBytes);
 
-        // Delta should never exceed full — synthetic fixtures or fully-changed
+        // Delta + overhead should never exceed full — synthetic fixtures or fully-changed
         // packages can otherwise tie.
-        if (delta > full) delta = full;
+        if (delta + overheadBytes > full) delta = Math.Max(0, full - overheadBytes);
+
+        var duplicates = FindDuplicateGroups(newFiles);
 
         return new PackageDiff
         {
@@ -255,8 +282,64 @@ public static class UpdateDiffService
             DeltaDownloadBytes = delta,
             OverheadBytes = overheadBytes,
             TotalBlocks = totalBlocks,
-            ReusedBlocks = reusedBlocks
+            ReusedBlocks = reusedBlocks,
+            NewPackageUncompressedBytes = newPackageUncompressed,
+            OldPackageUncompressedBytes = oldPackageUncompressed,
+            AddedFilesUncompressedBytes = addedUncompressed,
+            RemovedFilesUncompressedBytes = removedUncompressed,
+            ChangedFilesNetSizeBytes = changedNetSize,
+            UnchangedFilesUncompressedBytes = unchangedUncompressed,
+            DuplicateGroups = duplicates
         };
+    }
+
+    /// <summary>
+    /// Groups files within a single package that are byte-identical to each
+    /// other (same block-hash sequence). The first hit of each group is the
+    /// "original"; subsequent copies could be deduplicated by the package
+    /// author. Skips zero-byte files (uninteresting). Mirrors the SDK
+    /// comparepackage.exe Duplicate detection.
+    /// </summary>
+    public static IReadOnlyList<DuplicateFileGroup> FindDuplicateGroups(IReadOnlyList<BlockMapFile> files)
+    {
+        // Key = concatenated block hashes (or the marker "EMPTY" for zero-byte
+        // files we deliberately exclude below).
+        var groups = new Dictionary<string, List<BlockMapFile>>(StringComparer.Ordinal);
+
+        foreach (var file in files)
+        {
+            if (file.Blocks.Count == 0 || file.UncompressedSize == 0)
+                continue;
+
+            var key = string.Join('|', file.Blocks.Select(b => b.Hash));
+            if (!groups.TryGetValue(key, out var bucket))
+            {
+                bucket = [];
+                groups[key] = bucket;
+            }
+            bucket.Add(file);
+        }
+
+        var result = new List<DuplicateFileGroup>();
+        foreach (var (_, bucket) in groups)
+        {
+            if (bucket.Count < 2) continue;
+
+            var representative = bucket[0];
+            result.Add(new DuplicateFileGroup
+            {
+                Paths = bucket.Select(f => f.Name)
+                    .OrderBy(n => n, StringComparer.OrdinalIgnoreCase)
+                    .ToList(),
+                PerCopyUncompressedBytes = representative.UncompressedSize,
+                PerCopyOnWireBytes = representative.OnWireSize
+            });
+        }
+
+        return result
+            .OrderByDescending(g => g.PossibleImpactReductionBytes)
+            .ThenByDescending(g => g.CopyCount)
+            .ToList();
     }
 
     /// <summary>

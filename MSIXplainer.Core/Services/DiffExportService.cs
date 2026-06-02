@@ -30,8 +30,33 @@ public static class DiffExportService
         sb.AppendLine("| | Bytes | Human |");
         sb.AppendLine("|---|---:|---|");
         sb.AppendLine($"| Fresh install (full download) | {diff.TotalFullDownloadBytes:N0} | {Human(diff.TotalFullDownloadBytes)} |");
-        sb.AppendLine($"| Update (delta download per device) | {diff.TotalDeltaDownloadBytes:N0} | {Human(diff.TotalDeltaDownloadBytes)} |");
+        sb.AppendLine($"| Update impact (block delta — matches SDK) | {diff.TotalDeltaDownloadBytes:N0} | {Human(diff.TotalDeltaDownloadBytes)} |");
+        sb.AppendLine($"| + Metadata overhead (blockmap, signature, content-types) | {diff.TotalOverheadBytes:N0} | {Human(diff.TotalOverheadBytes)} |");
+        sb.AppendLine($"| = Total wire bytes per device | {diff.TotalUpdateDownloadBytes:N0} | **{Human(diff.TotalUpdateDownloadBytes)}** |");
         sb.AppendLine($"| Savings vs. full install | — | **{savings:F1}%** |");
+        sb.AppendLine();
+
+        // Footprint / inventory churn
+        var totalAdded = diff.PackageDiffs.Sum(p => p.AddedFilesUncompressedBytes);
+        var totalRemoved = diff.PackageDiffs.Sum(p => p.RemovedFilesUncompressedBytes);
+        var totalChangedNet = diff.PackageDiffs.Sum(p => p.ChangedFilesNetSizeBytes);
+        var totalUnchanged = diff.PackageDiffs.Sum(p => p.UnchangedFilesUncompressedBytes);
+        var totalNewSize = diff.PackageDiffs.Sum(p => p.NewPackageUncompressedBytes);
+        var addedFiles = diff.PackageDiffs.Sum(p => p.AddedFileCount);
+        var removedFiles = diff.PackageDiffs.Sum(p => p.RemovedFileCount);
+        var modifiedFiles = diff.PackageDiffs.Sum(p => p.ModifiedFileCount);
+        var unchangedFiles = diff.PackageDiffs.Sum(p => p.UnchangedFileCount);
+
+        sb.AppendLine("## File inventory & disk footprint");
+        sb.AppendLine();
+        sb.AppendLine("| Metric | Count | Uncompressed bytes | Human |");
+        sb.AppendLine("|---|---:|---:|---|");
+        sb.AppendLine($"| Added files | {addedFiles:N0} | {totalAdded:N0} | {Human(totalAdded)} |");
+        sb.AppendLine($"| Deleted files | {removedFiles:N0} | {totalRemoved:N0} | {Human(totalRemoved)} |");
+        sb.AppendLine($"| Modified files (net size shift) | {modifiedFiles:N0} | {totalChangedNet:N0} | {SignedHuman(totalChangedNet)} |");
+        sb.AppendLine($"| Unchanged files | {unchangedFiles:N0} | {totalUnchanged:N0} | {Human(totalUnchanged)} |");
+        sb.AppendLine($"| **New package total (installed)** | — | {totalNewSize:N0} | **{Human(totalNewSize)}** |");
+        sb.AppendLine($"| **Additional disk space needed** | — | {diff.TotalInstalledSizeDifferenceBytes:N0} | **{SignedHuman(diff.TotalInstalledSizeDifferenceBytes)}** |");
         sb.AppendLine();
 
         // Warnings
@@ -59,16 +84,41 @@ public static class DiffExportService
         // Per-package breakdown
         sb.AppendLine("## Per-package breakdown");
         sb.AppendLine();
-        sb.AppendLine("| Package | Old → New | Full | Delta | Savings | Blocks reused |");
-        sb.AppendLine("|---|---|---:|---:|---:|---:|");
+        sb.AppendLine("| Package | Old → New | Full | Delta | Overhead | Total wire | Savings | Blocks reused |");
+        sb.AppendLine("|---|---|---:|---:|---:|---:|---:|---:|");
         foreach (var p in diff.PackageDiffs)
         {
             sb.AppendLine(
                 $"| {Esc(p.Label)} | {Esc(p.OldVersion)} → {Esc(p.NewVersion)} | " +
                 $"{Human(p.FullDownloadBytes)} | {Human(p.DeltaDownloadBytes)} | " +
+                $"{Human(p.OverheadBytes)} | {Human(p.TotalUpdateDownloadBytes)} | " +
                 $"{p.SavingsPercent:F1}% | {p.ReusedBlocks}/{p.TotalBlocks} |");
         }
         sb.AppendLine();
+
+        // Duplicate-file optimization opportunities (across all package diffs)
+        var allDuplicates = diff.PackageDiffs
+            .SelectMany(p => p.DuplicateGroups.Select(g => (Package: p.Label, Group: g)))
+            .ToList();
+
+        if (allDuplicates.Count > 0)
+        {
+            var totalReclaim = allDuplicates.Sum(d => d.Group.PossibleSizeReductionBytes);
+            var totalImpactReclaim = allDuplicates.Sum(d => d.Group.PossibleImpactReductionBytes);
+            sb.AppendLine($"## Optimization opportunity: {allDuplicates.Count} duplicate file groups");
+            sb.AppendLine();
+            sb.AppendLine($"The new package contains files with identical content stored under different names. Deduplicating these would reclaim **{Human(totalReclaim)}** of installed footprint and **{Human(totalImpactReclaim)}** of fresh-install download.");
+            sb.AppendLine();
+            sb.AppendLine("| Package | Copies | Per copy | Reclaimable | Example path |");
+            sb.AppendLine("|---|---:|---:|---:|---|");
+            foreach (var (pkg, g) in allDuplicates.OrderByDescending(x => x.Group.PossibleSizeReductionBytes).Take(20))
+            {
+                sb.AppendLine(
+                    $"| {Esc(pkg)} | {g.CopyCount} | {Human(g.PerCopyUncompressedBytes)} | " +
+                    $"{Human(g.PossibleSizeReductionBytes)} | `{Esc(g.Paths[0])}` |");
+            }
+            sb.AppendLine();
+        }
 
         // Top changed files (collected across all package diffs)
         var topFileChanges = diff.PackageDiffs
@@ -132,6 +182,9 @@ public static class DiffExportService
             {
                 FullDownloadBytes = diff.TotalFullDownloadBytes,
                 DeltaDownloadBytes = diff.TotalDeltaDownloadBytes,
+                OverheadBytes = diff.TotalOverheadBytes,
+                TotalUpdateDownloadBytes = diff.TotalUpdateDownloadBytes,
+                InstalledSizeDifferenceBytes = diff.TotalInstalledSizeDifferenceBytes,
                 diff.SavingsPercent
             },
             diff.Warnings,
@@ -146,6 +199,7 @@ public static class DiffExportService
                 p.FullDownloadBytes,
                 p.DeltaDownloadBytes,
                 p.OverheadBytes,
+                p.TotalUpdateDownloadBytes,
                 p.SavingsPercent,
                 p.TotalBlocks,
                 p.ReusedBlocks,
@@ -154,6 +208,13 @@ public static class DiffExportService
                 p.RemovedFileCount,
                 p.ModifiedFileCount,
                 p.UnchangedFileCount,
+                p.NewPackageUncompressedBytes,
+                p.OldPackageUncompressedBytes,
+                p.AddedFilesUncompressedBytes,
+                p.RemovedFilesUncompressedBytes,
+                p.ChangedFilesNetSizeBytes,
+                p.UnchangedFilesUncompressedBytes,
+                p.InstalledSizeDifferenceBytes,
                 Files = p.Files.Select(f => new
                 {
                     f.Path,
@@ -165,6 +226,15 @@ public static class DiffExportService
                     f.TotalBlocks,
                     f.ReusedBlocks,
                     f.NewBlocks
+                }),
+                Duplicates = p.DuplicateGroups.Select(g => new
+                {
+                    g.Paths,
+                    g.CopyCount,
+                    g.PerCopyUncompressedBytes,
+                    g.PerCopyOnWireBytes,
+                    g.PossibleSizeReductionBytes,
+                    g.PossibleImpactReductionBytes
                 })
             }),
             Bandwidth = bandwidth is null ? null : new
@@ -193,12 +263,20 @@ public static class DiffExportService
 
     public static string Human(long bytes)
     {
+        if (bytes < 0) return "-" + Human(-bytes);
         if (bytes < 1024) return $"{bytes} B";
         double v = bytes;
         string[] units = ["KB", "MB", "GB", "TB"];
         int i = -1;
         do { v /= 1024; i++; } while (v >= 1024 && i < units.Length - 1);
         return $"{v:F2} {units[i]}";
+    }
+
+    /// <summary>Like Human but always shows the sign for non-zero values (useful for deltas).</summary>
+    public static string SignedHuman(long bytes)
+    {
+        if (bytes == 0) return "0 B";
+        return (bytes > 0 ? "+" : "") + Human(bytes);
     }
 
     public static string FormatDuration(TimeSpan d)

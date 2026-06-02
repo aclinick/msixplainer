@@ -56,12 +56,13 @@ static class DiffCommand
         }
 
         BandwidthEstimate? bandwidth = null;
+        // Bandwidth — use total wire bytes (delta + metadata) for accuracy.
         if (options.DeviceCount is { } devices)
         {
             try
             {
                 bandwidth = BandwidthPlannerService.Calculate(
-                    deltaBytesPerDevice: result.TotalDeltaDownloadBytes,
+                    deltaBytesPerDevice: result.TotalUpdateDownloadBytes,
                     deviceCount: devices,
                     linkSpeedsMbps: options.LinkSpeedsMbps,
                     costPerGigabyteUsd: options.CostPerGigabyteUsd);
@@ -125,14 +126,51 @@ static class DiffCommand
             $"{result.TotalFullDownloadBytes:N0}",
             $"[cyan]{DiffExportService.Human(result.TotalFullDownloadBytes)}[/]");
         headline.AddRow(
-            "[bold]Update (delta per device)[/]",
+            "[bold]Update impact (block delta)[/]",
             $"{result.TotalDeltaDownloadBytes:N0}",
             $"[green]{DiffExportService.Human(result.TotalDeltaDownloadBytes)}[/]");
+        headline.AddRow(
+            "[grey]+ Metadata overhead[/]",
+            $"{result.TotalOverheadBytes:N0}",
+            $"[grey]{DiffExportService.Human(result.TotalOverheadBytes)}[/]");
+        headline.AddRow(
+            "[bold]= Total wire bytes per device[/]",
+            $"{result.TotalUpdateDownloadBytes:N0}",
+            $"[green bold]{DiffExportService.Human(result.TotalUpdateDownloadBytes)}[/]");
         headline.AddRow(
             "[bold]Savings vs. full install[/]",
             "—",
             $"[bold green]{result.SavingsPercent:F1}%[/]");
         AnsiConsole.Write(headline);
+
+        // File inventory / disk footprint summary
+        AnsiConsole.WriteLine();
+        AnsiConsole.Write(new Rule("[bold]File inventory & disk footprint[/]").LeftJustified());
+        var totalAdded = result.PackageDiffs.Sum(p => p.AddedFilesUncompressedBytes);
+        var totalRemoved = result.PackageDiffs.Sum(p => p.RemovedFilesUncompressedBytes);
+        var totalChangedNet = result.PackageDiffs.Sum(p => p.ChangedFilesNetSizeBytes);
+        var totalUnchanged = result.PackageDiffs.Sum(p => p.UnchangedFilesUncompressedBytes);
+        var totalNewSize = result.PackageDiffs.Sum(p => p.NewPackageUncompressedBytes);
+        var addedCount = result.PackageDiffs.Sum(p => p.AddedFileCount);
+        var removedCount = result.PackageDiffs.Sum(p => p.RemovedFileCount);
+        var modifiedCount = result.PackageDiffs.Sum(p => p.ModifiedFileCount);
+        var unchangedCount = result.PackageDiffs.Sum(p => p.UnchangedFileCount);
+
+        var inv = new Table()
+            .Border(TableBorder.Rounded)
+            .AddColumn("Metric")
+            .AddColumn(new TableColumn("Count").RightAligned())
+            .AddColumn(new TableColumn("Bytes").RightAligned())
+            .AddColumn(new TableColumn("Human").RightAligned());
+        inv.AddRow("[green]Added files[/]", $"{addedCount:N0}", $"{totalAdded:N0}", DiffExportService.Human(totalAdded));
+        inv.AddRow("[red]Deleted files[/]", $"{removedCount:N0}", $"{totalRemoved:N0}", DiffExportService.Human(totalRemoved));
+        inv.AddRow("[yellow]Modified files (net size shift)[/]", $"{modifiedCount:N0}", $"{totalChangedNet:N0}", DiffExportService.SignedHuman(totalChangedNet));
+        inv.AddRow("[grey]Unchanged files[/]", $"{unchangedCount:N0}", $"{totalUnchanged:N0}", DiffExportService.Human(totalUnchanged));
+        inv.AddRow("[bold]New package total[/]", "—", $"{totalNewSize:N0}", $"[cyan]{DiffExportService.Human(totalNewSize)}[/]");
+        inv.AddRow("[bold]Additional disk space needed[/]", "—",
+            $"{result.TotalInstalledSizeDifferenceBytes:N0}",
+            $"[bold {(result.TotalInstalledSizeDifferenceBytes >= 0 ? "yellow" : "green")}]{DiffExportService.SignedHuman(result.TotalInstalledSizeDifferenceBytes)}[/]");
+        AnsiConsole.Write(inv);
 
         // Warnings
         if (result.Warnings.Count > 0)
@@ -161,6 +199,8 @@ static class DiffCommand
             .AddColumn("Old → New")
             .AddColumn(new TableColumn("Full").RightAligned())
             .AddColumn(new TableColumn("Delta").RightAligned())
+            .AddColumn(new TableColumn("Overhead").RightAligned())
+            .AddColumn(new TableColumn("Total wire").RightAligned())
             .AddColumn(new TableColumn("Savings").RightAligned())
             .AddColumn(new TableColumn("Blocks").RightAligned());
 
@@ -171,10 +211,44 @@ static class DiffCommand
                 $"{Markup.Escape(p.OldVersion)} → {Markup.Escape(p.NewVersion)}",
                 DiffExportService.Human(p.FullDownloadBytes),
                 DiffExportService.Human(p.DeltaDownloadBytes),
+                DiffExportService.Human(p.OverheadBytes),
+                DiffExportService.Human(p.TotalUpdateDownloadBytes),
                 $"{p.SavingsPercent:F1}%",
                 $"{p.ReusedBlocks}/{p.TotalBlocks}");
         }
         AnsiConsole.Write(pkgTable);
+
+        // Duplicate-file optimization opportunities
+        var allDuplicates = result.PackageDiffs
+            .SelectMany(p => p.DuplicateGroups.Select(g => (Package: p.Label, Group: g)))
+            .ToList();
+
+        if (allDuplicates.Count > 0)
+        {
+            AnsiConsole.WriteLine();
+            var totalReclaim = allDuplicates.Sum(d => d.Group.PossibleSizeReductionBytes);
+            AnsiConsole.Write(new Rule($"[bold]Optimization: {allDuplicates.Count} duplicate file groups — reclaim {DiffExportService.Human(totalReclaim)}[/]").LeftJustified());
+            var dupTable = new Table()
+                .Border(TableBorder.Rounded)
+                .AddColumn("Package")
+                .AddColumn(new TableColumn("Copies").RightAligned())
+                .AddColumn(new TableColumn("Per copy").RightAligned())
+                .AddColumn(new TableColumn("Reclaim").RightAligned())
+                .AddColumn("Example path");
+
+            foreach (var (pkg, g) in allDuplicates
+                .OrderByDescending(x => x.Group.PossibleSizeReductionBytes)
+                .Take(15))
+            {
+                dupTable.AddRow(
+                    Markup.Escape(pkg),
+                    g.CopyCount.ToString(),
+                    DiffExportService.Human(g.PerCopyUncompressedBytes),
+                    DiffExportService.Human(g.PossibleSizeReductionBytes),
+                    Markup.Escape(Truncate(g.Paths[0], 60)));
+            }
+            AnsiConsole.Write(dupTable);
+        }
 
         // Top files
         var topFileChanges = result.PackageDiffs

@@ -136,45 +136,134 @@
                             BorderThickness="1"
                             CornerRadius="8"
                             Padding="20">
-                        <Grid ColumnSpacing="24" RowSpacing="8">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                            </Grid.RowDefinitions>
+                        <StackPanel Spacing="16">
+                            <Grid ColumnSpacing="24" RowSpacing="8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
 
-                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Full download (fresh install)"
-                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                            <TextBlock Grid.Row="0" Grid.Column="1" Text="Update download"
-                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                            <TextBlock Grid.Row="0" Grid.Column="2" Text="Bandwidth saved"
-                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Full download (fresh install)"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                <TextBlock Grid.Row="0" Grid.Column="1" Text="Total wire bytes per device"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                <TextBlock Grid.Row="0" Grid.Column="2" Text="Bandwidth saved"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
 
-                            <TextBlock Grid.Row="1" Grid.Column="0"
-                                       Text="{x:Bind ViewModel.FullDownloadDisplay, Mode=OneWay}"
-                                       Style="{StaticResource SubtitleTextBlockStyle}" />
-                            <TextBlock Grid.Row="1" Grid.Column="1"
-                                       AutomationProperties.AutomationId="DeltaDownloadDisplay"
-                                       Text="{x:Bind ViewModel.DeltaDownloadDisplay, Mode=OneWay}"
-                                       Style="{StaticResource SubtitleTextBlockStyle}" />
-                            <TextBlock Grid.Row="1" Grid.Column="2"
-                                       AutomationProperties.AutomationId="SavingsDisplay"
-                                       Text="{x:Bind ViewModel.SavingsDisplay, Mode=OneWay}"
-                                       Style="{StaticResource SubtitleTextBlockStyle}"
-                                       Foreground="{ThemeResource SystemFillColorSuccessBrush}" />
+                                <TextBlock Grid.Row="1" Grid.Column="0"
+                                           Text="{x:Bind ViewModel.FullDownloadDisplay, Mode=OneWay}"
+                                           Style="{StaticResource SubtitleTextBlockStyle}" />
+                                <TextBlock Grid.Row="1" Grid.Column="1"
+                                           AutomationProperties.AutomationId="TotalWireDisplay"
+                                           Text="{x:Bind ViewModel.TotalWireDisplay, Mode=OneWay}"
+                                           Style="{StaticResource SubtitleTextBlockStyle}" />
+                                <TextBlock Grid.Row="1" Grid.Column="2"
+                                           AutomationProperties.AutomationId="SavingsDisplay"
+                                           Text="{x:Bind ViewModel.SavingsDisplay, Mode=OneWay}"
+                                           Style="{StaticResource SubtitleTextBlockStyle}"
+                                           Foreground="{ThemeResource SystemFillColorSuccessBrush}" />
 
-                            <TextBlock Grid.Row="2" Grid.Column="0"
-                                       Text="{x:Bind ViewModel.OldLabel, Mode=OneWay}"
-                                       Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
-                            <TextBlock Grid.Row="2" Grid.Column="1"
-                                       Text="{x:Bind ViewModel.NewLabel, Mode=OneWay}"
-                                       Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
-                        </Grid>
+                                <TextBlock Grid.Row="2" Grid.Column="0"
+                                           Text="{x:Bind ViewModel.OldLabel, Mode=OneWay}"
+                                           Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                                <TextBlock Grid.Row="2" Grid.Column="1"
+                                           Text="{x:Bind ViewModel.NewLabel, Mode=OneWay}"
+                                           Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                            </Grid>
+
+                            <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" />
+
+                            <Grid ColumnSpacing="24" RowSpacing="4">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Block delta (matches SDK comparepackage.exe):"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                <TextBlock Grid.Row="0" Grid.Column="1"
+                                           AutomationProperties.AutomationId="DeltaDownloadDisplay"
+                                           Text="{x:Bind ViewModel.DeltaDownloadDisplay, Mode=OneWay}" />
+                                <TextBlock Grid.Row="1" Grid.Column="0" Text="+ Metadata overhead (blockmap, signature, content-types):"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                <TextBlock Grid.Row="1" Grid.Column="1"
+                                           Text="{x:Bind ViewModel.OverheadDisplay, Mode=OneWay}"
+                                           Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- File inventory & disk footprint -->
+                    <Border Background="{ThemeResource LayerFillColorDefaultBrush}"
+                            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                            BorderThickness="1"
+                            CornerRadius="8"
+                            Padding="20">
+                        <StackPanel Spacing="12">
+                            <TextBlock Text="File inventory &amp; disk footprint"
+                                       Style="{StaticResource BodyStrongTextBlockStyle}" />
+                            <Grid ColumnSpacing="20" RowSpacing="6">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Added:"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                <TextBlock Grid.Row="0" Grid.Column="1"
+                                           AutomationProperties.AutomationId="AddedFilesDisplay"
+                                           Text="{x:Bind ViewModel.AddedFilesDisplay, Mode=OneWay}" />
+                                <TextBlock Grid.Row="0" Grid.Column="2" Text="Deleted:"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                <TextBlock Grid.Row="0" Grid.Column="3"
+                                           AutomationProperties.AutomationId="DeletedFilesDisplay"
+                                           Text="{x:Bind ViewModel.DeletedFilesDisplay, Mode=OneWay}" />
+
+                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Modified:"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                <TextBlock Grid.Row="1" Grid.Column="1"
+                                           AutomationProperties.AutomationId="ModifiedNetDisplay"
+                                           Text="{x:Bind ViewModel.ModifiedNetDisplay, Mode=OneWay}" />
+                                <TextBlock Grid.Row="1" Grid.Column="2" Text="Unchanged:"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                <TextBlock Grid.Row="1" Grid.Column="3"
+                                           AutomationProperties.AutomationId="UnchangedDisplay"
+                                           Text="{x:Bind ViewModel.UnchangedDisplay, Mode=OneWay}" />
+
+                                <Border Grid.Row="2" Grid.ColumnSpan="4" Height="1" Margin="0,4"
+                                        Background="{ThemeResource DividerStrokeColorDefaultBrush}" />
+
+                                <TextBlock Grid.Row="3" Grid.Column="0" Text="New package installed size:"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                <TextBlock Grid.Row="3" Grid.Column="1"
+                                           AutomationProperties.AutomationId="NewPackageTotalDisplay"
+                                           Text="{x:Bind ViewModel.NewPackageTotalDisplay, Mode=OneWay}"
+                                           Style="{StaticResource BodyStrongTextBlockStyle}" />
+                                <TextBlock Grid.Row="3" Grid.Column="2" Text="Additional disk needed:"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                <TextBlock Grid.Row="3" Grid.Column="3"
+                                           AutomationProperties.AutomationId="DiskSpaceNeededDisplay"
+                                           Text="{x:Bind ViewModel.DiskSpaceNeededDisplay, Mode=OneWay}"
+                                           Style="{StaticResource BodyStrongTextBlockStyle}" />
+                            </Grid>
+                        </StackPanel>
                     </Border>
 
                     <ItemsControl ItemsSource="{x:Bind ViewModel.Warnings}">
@@ -444,6 +533,65 @@
                             </DataTemplate>
                         </ListView.ItemTemplate>
                     </ListView>
+
+                    <!-- Duplicate-file optimization opportunities -->
+                    <StackPanel Spacing="12"
+                                Visibility="{x:Bind local:ComparePage.BoolToVisibility(ViewModel.HasDuplicates), Mode=OneWay}">
+                        <TextBlock Style="{StaticResource SubtitleTextBlockStyle}"
+                                   Text="Optimization opportunity: duplicate files" />
+                        <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                   AutomationProperties.AutomationId="DuplicatesHeadline"
+                                   Text="{x:Bind ViewModel.DuplicatesHeadline, Mode=OneWay}" />
+                        <ListView ItemsSource="{x:Bind ViewModel.DuplicateGroups}"
+                                  SelectionMode="None">
+                            <ListView.ItemContainerStyle>
+                                <Style TargetType="ListViewItem">
+                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                    <Setter Property="Padding" Value="12,6" />
+                                </Style>
+                            </ListView.ItemContainerStyle>
+                            <ListView.HeaderTemplate>
+                                <DataTemplate>
+                                    <Grid ColumnSpacing="16" Padding="12,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="80" />
+                                            <ColumnDefinition Width="120" />
+                                            <ColumnDefinition Width="120" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="Example path"
+                                                   Style="{StaticResource BodyStrongTextBlockStyle}" />
+                                        <TextBlock Grid.Column="1" Text="Copies"
+                                                   HorizontalAlignment="Right"
+                                                   Style="{StaticResource BodyStrongTextBlockStyle}" />
+                                        <TextBlock Grid.Column="2" Text="Per copy"
+                                                   HorizontalAlignment="Right"
+                                                   Style="{StaticResource BodyStrongTextBlockStyle}" />
+                                        <TextBlock Grid.Column="3" Text="Reclaimable"
+                                                   HorizontalAlignment="Right"
+                                                   Style="{StaticResource BodyStrongTextBlockStyle}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ListView.HeaderTemplate>
+                            <ListView.ItemTemplate>
+                                <DataTemplate x:DataType="vm:DuplicateGroupRow">
+                                    <Grid ColumnSpacing="16">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="80" />
+                                            <ColumnDefinition Width="120" />
+                                            <ColumnDefinition Width="120" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="{x:Bind ExamplePath}" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Grid.Column="1" Text="{x:Bind Copies}" HorizontalAlignment="Right" />
+                                        <TextBlock Grid.Column="2" Text="{x:Bind PerCopy}" HorizontalAlignment="Right" />
+                                        <TextBlock Grid.Column="3" Text="{x:Bind Reclaim}" HorizontalAlignment="Right"
+                                                   Foreground="{ThemeResource SystemFillColorSuccessBrush}" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
+                    </StackPanel>
 
                 </StackPanel>
             </StackPanel>

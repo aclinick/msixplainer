@@ -28,11 +28,24 @@ public sealed class UpdateDiffResult
 
     public long TotalFullDownloadBytes => PackageDiffs.Sum(p => p.FullDownloadBytes);
     public long TotalDeltaDownloadBytes => PackageDiffs.Sum(p => p.DeltaDownloadBytes);
+    public long TotalOverheadBytes => PackageDiffs.Sum(p => p.OverheadBytes);
+
+    /// <summary>
+    /// Total bytes a device actually pulls over the network for the update —
+    /// block-delta payload plus fixed metadata (AppxBlockMap.xml, AppxSignature.p7x,
+    /// [Content_Types].xml). Use this for bandwidth planning. The block-delta
+    /// number alone (TotalDeltaDownloadBytes) matches the Windows SDK
+    /// comparepackage.exe `UpdateImpact` value to the byte.
+    /// </summary>
+    public long TotalUpdateDownloadBytes => TotalDeltaDownloadBytes + TotalOverheadBytes;
+
+    /// <summary>Sum of (NewPackageUncompressedBytes − OldPackageUncompressedBytes) over all packages — the net installed-footprint change.</summary>
+    public long TotalInstalledSizeDifferenceBytes => PackageDiffs.Sum(p => p.InstalledSizeDifferenceBytes);
 
     public double SavingsPercent =>
         TotalFullDownloadBytes == 0
             ? 0
-            : 100.0 * (TotalFullDownloadBytes - TotalDeltaDownloadBytes) / TotalFullDownloadBytes;
+            : 100.0 * (TotalFullDownloadBytes - TotalUpdateDownloadBytes) / TotalFullDownloadBytes;
 }
 
 /// <summary>
@@ -56,9 +69,13 @@ public sealed class PackageDiff
     public required long FullDownloadBytes { get; init; }
 
     /// <summary>
-    /// On-wire bytes that must be downloaded for the update: the sum of on-wire
-    /// block sizes for blocks in the new package whose hashes are not present
-    /// in the same-path file of the old package, plus the fixed overhead.
+    /// On-wire bytes the device downloads for changed payload blocks: the sum of
+    /// on-wire block sizes for blocks in the new package whose hashes are not
+    /// present in the same-path file of the old package. Matches the Windows
+    /// SDK comparepackage.exe `Package/@UpdateImpact` value exactly (which is
+    /// itself defined as AddedFiles.UpdateImpact + ChangedFiles.UpdateImpact).
+    /// Does NOT include the fixed metadata overhead — see OverheadBytes and
+    /// TotalUpdateDownloadBytes for that.
     /// </summary>
     public required long DeltaDownloadBytes { get; init; }
 
@@ -70,6 +87,9 @@ public sealed class PackageDiff
     /// </summary>
     public required long OverheadBytes { get; init; }
 
+    /// <summary>Total wire bytes pulled for this update = DeltaDownloadBytes + OverheadBytes.</summary>
+    public long TotalUpdateDownloadBytes => DeltaDownloadBytes + OverheadBytes;
+
     /// <summary>Total blocks in the new package.</summary>
     public required int TotalBlocks { get; init; }
 
@@ -78,15 +98,73 @@ public sealed class PackageDiff
 
     public int NewBlocks => TotalBlocks - ReusedBlocks;
 
+    /// <summary>Sum of uncompressed sizes of all files in the new package (matches SDK `Package/@Size`).</summary>
+    public required long NewPackageUncompressedBytes { get; init; }
+
+    /// <summary>Sum of uncompressed sizes of all files in the old package.</summary>
+    public required long OldPackageUncompressedBytes { get; init; }
+
+    /// <summary>Sum of uncompressed sizes of files added in the new package (matches SDK `Package/@AddedSize`).</summary>
+    public required long AddedFilesUncompressedBytes { get; init; }
+
+    /// <summary>Sum of uncompressed sizes of files removed in the new package (matches SDK `Package/@DeletedSize`).</summary>
+    public required long RemovedFilesUncompressedBytes { get; init; }
+
+    /// <summary>Net size change across modified files (Σ NewSize − OldSize) — matches SDK `ChangedFiles/@SizeDifference`.</summary>
+    public required long ChangedFilesNetSizeBytes { get; init; }
+
+    /// <summary>Sum of uncompressed sizes of files identical in both packages.</summary>
+    public required long UnchangedFilesUncompressedBytes { get; init; }
+
+    /// <summary>
+    /// Net installed-footprint change after applying the update (matches SDK
+    /// `Package/@SizeDifference`). Equivalent to NewPackageUncompressedBytes −
+    /// OldPackageUncompressedBytes. Useful for capacity planning: "will the
+    /// upgraded package still fit?".
+    /// </summary>
+    public long InstalledSizeDifferenceBytes =>
+        NewPackageUncompressedBytes - OldPackageUncompressedBytes;
+
+    /// <summary>
+    /// Groups of files in the new package that are byte-identical to each other
+    /// (same block-hash sequence). Each group surfaces the bytes the package
+    /// author could save by deduplicating the content.
+    /// </summary>
+    public IReadOnlyList<DuplicateFileGroup> DuplicateGroups { get; init; } = [];
+
     public double SavingsPercent =>
         FullDownloadBytes == 0
             ? 0
-            : 100.0 * (FullDownloadBytes - DeltaDownloadBytes) / FullDownloadBytes;
+            : 100.0 * (FullDownloadBytes - TotalUpdateDownloadBytes) / FullDownloadBytes;
 
     public int AddedFileCount => Files.Count(f => f.Status == FileDiffStatus.Added);
     public int RemovedFileCount => Files.Count(f => f.Status == FileDiffStatus.Removed);
     public int ModifiedFileCount => Files.Count(f => f.Status == FileDiffStatus.Modified);
     public int UnchangedFileCount => Files.Count(f => f.Status == FileDiffStatus.Unchanged);
+}
+
+/// <summary>
+/// A set of files in the new package that are byte-identical (same block-hash
+/// sequence). Mirrors the SDK comparepackage.exe `Duplicate` entries — exposes
+/// how much the package author could save by deduplicating the content.
+/// </summary>
+public sealed class DuplicateFileGroup
+{
+    public required IReadOnlyList<string> Paths { get; init; }
+
+    /// <summary>Uncompressed size of one copy of the duplicated content.</summary>
+    public required long PerCopyUncompressedBytes { get; init; }
+
+    /// <summary>On-wire bytes for one copy (compressed if compressed in package).</summary>
+    public required long PerCopyOnWireBytes { get; init; }
+
+    public int CopyCount => Paths.Count;
+
+    /// <summary>Uncompressed bytes that could be reclaimed if dedup'd.</summary>
+    public long PossibleSizeReductionBytes => (CopyCount - 1) * PerCopyUncompressedBytes;
+
+    /// <summary>On-wire bytes that could be saved on a fresh install if dedup'd.</summary>
+    public long PossibleImpactReductionBytes => (CopyCount - 1) * PerCopyOnWireBytes;
 }
 
 /// <summary>

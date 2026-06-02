@@ -30,7 +30,16 @@ public partial class ComparePageViewModel : ObservableObject
 
     [ObservableProperty] public partial string FullDownloadDisplay { get; set; } = "—";
     [ObservableProperty] public partial string DeltaDownloadDisplay { get; set; } = "—";
+    [ObservableProperty] public partial string OverheadDisplay { get; set; } = "—";
+    [ObservableProperty] public partial string TotalWireDisplay { get; set; } = "—";
     [ObservableProperty] public partial string SavingsDisplay { get; set; } = "—";
+
+    [ObservableProperty] public partial string AddedFilesDisplay { get; set; } = "—";
+    [ObservableProperty] public partial string DeletedFilesDisplay { get; set; } = "—";
+    [ObservableProperty] public partial string ModifiedNetDisplay { get; set; } = "—";
+    [ObservableProperty] public partial string UnchangedDisplay { get; set; } = "—";
+    [ObservableProperty] public partial string NewPackageTotalDisplay { get; set; } = "—";
+    [ObservableProperty] public partial string DiskSpaceNeededDisplay { get; set; } = "—";
 
     // Planner inputs (TwoWay-bound).
     [ObservableProperty] public partial int DeviceCount { get; set; } = 500;
@@ -47,6 +56,10 @@ public partial class ComparePageViewModel : ObservableObject
     public ObservableCollection<PackageDiff> PackageDiffs { get; } = [];
     public ObservableCollection<FileDiffRow> TopFileChanges { get; } = [];
     public ObservableCollection<LinkSpeedRow> LinkProjections { get; } = [];
+    public ObservableCollection<DuplicateGroupRow> DuplicateGroups { get; } = [];
+
+    [ObservableProperty] public partial bool HasDuplicates { get; set; }
+    [ObservableProperty] public partial string DuplicatesHeadline { get; set; } = string.Empty;
 
     private UpdateDiffResult? _lastResult;
     private BandwidthEstimate? _lastBandwidth;
@@ -142,7 +155,7 @@ public partial class ComparePageViewModel : ObservableObject
         try
         {
             var bw = BandwidthPlannerService.Calculate(
-                deltaBytesPerDevice: _lastResult.TotalDeltaDownloadBytes,
+                deltaBytesPerDevice: _lastResult.TotalUpdateDownloadBytes,
                 deviceCount: DeviceCount,
                 linkSpeedsMbps: links,
                 costPerGigabyteUsd: CostPerGb > 0 ? CostPerGb : null);
@@ -179,7 +192,26 @@ public partial class ComparePageViewModel : ObservableObject
 
         FullDownloadDisplay = $"{Human(r.TotalFullDownloadBytes)}  ({r.TotalFullDownloadBytes:N0} bytes)";
         DeltaDownloadDisplay = $"{Human(r.TotalDeltaDownloadBytes)}  ({r.TotalDeltaDownloadBytes:N0} bytes)";
+        OverheadDisplay = $"{Human(r.TotalOverheadBytes)}  ({r.TotalOverheadBytes:N0} bytes)";
+        TotalWireDisplay = $"{Human(r.TotalUpdateDownloadBytes)}  ({r.TotalUpdateDownloadBytes:N0} bytes)";
         SavingsDisplay = $"{r.SavingsPercent:F1}%";
+
+        var totalAdded = r.PackageDiffs.Sum(p => p.AddedFilesUncompressedBytes);
+        var totalRemoved = r.PackageDiffs.Sum(p => p.RemovedFilesUncompressedBytes);
+        var totalChangedNet = r.PackageDiffs.Sum(p => p.ChangedFilesNetSizeBytes);
+        var totalUnchanged = r.PackageDiffs.Sum(p => p.UnchangedFilesUncompressedBytes);
+        var totalNewSize = r.PackageDiffs.Sum(p => p.NewPackageUncompressedBytes);
+        var addedCount = r.PackageDiffs.Sum(p => p.AddedFileCount);
+        var removedCount = r.PackageDiffs.Sum(p => p.RemovedFileCount);
+        var modifiedCount = r.PackageDiffs.Sum(p => p.ModifiedFileCount);
+        var unchangedCount = r.PackageDiffs.Sum(p => p.UnchangedFileCount);
+
+        AddedFilesDisplay = $"{addedCount:N0} files · {Human(totalAdded)}";
+        DeletedFilesDisplay = $"{removedCount:N0} files · {Human(totalRemoved)}";
+        ModifiedNetDisplay = $"{modifiedCount:N0} files · {SignedHuman(totalChangedNet)} net";
+        UnchangedDisplay = $"{unchangedCount:N0} files · {Human(totalUnchanged)}";
+        NewPackageTotalDisplay = Human(totalNewSize);
+        DiskSpaceNeededDisplay = SignedHuman(r.TotalInstalledSizeDifferenceBytes);
 
         Warnings.Clear();
         foreach (var w in r.Warnings) Warnings.Add(w);
@@ -210,6 +242,34 @@ public partial class ComparePageViewModel : ObservableObject
             .OrderByDescending(row => row.DeltaBytes)
             .Take(50);
         foreach (var f in top) TopFileChanges.Add(f);
+
+        DuplicateGroups.Clear();
+        var dups = r.PackageDiffs
+            .SelectMany(p => p.DuplicateGroups.Select(g => new DuplicateGroupRow
+            {
+                Package = p.Label,
+                Copies = g.CopyCount,
+                PerCopy = Human(g.PerCopyUncompressedBytes),
+                Reclaim = Human(g.PossibleSizeReductionBytes),
+                ExamplePath = g.Paths[0],
+                ReclaimBytes = g.PossibleSizeReductionBytes
+            }))
+            .OrderByDescending(d => d.ReclaimBytes)
+            .Take(50)
+            .ToList();
+        foreach (var d in dups) DuplicateGroups.Add(d);
+
+        if (dups.Count > 0)
+        {
+            var totalReclaim = r.PackageDiffs.Sum(p => p.DuplicateGroups.Sum(g => g.PossibleSizeReductionBytes));
+            DuplicatesHeadline = $"{dups.Count:N0} duplicate file groups — reclaim {Human(totalReclaim)} by deduplicating";
+            HasDuplicates = true;
+        }
+        else
+        {
+            HasDuplicates = false;
+            DuplicatesHeadline = string.Empty;
+        }
     }
 
     private static async Task<string?> PickPackageFileAsync()
@@ -241,12 +301,19 @@ public partial class ComparePageViewModel : ObservableObject
 
     private static string Human(long bytes)
     {
+        if (bytes < 0) return "-" + Human(-bytes);
         if (bytes < 1024) return $"{bytes} B";
         double v = bytes;
         string[] units = ["KB", "MB", "GB", "TB"];
         int i = -1;
         do { v /= 1024; i++; } while (v >= 1024 && i < units.Length - 1);
         return $"{v:F2} {units[i]}";
+    }
+
+    private static string SignedHuman(long bytes)
+    {
+        if (bytes == 0) return "0 B";
+        return (bytes > 0 ? "+" : "") + Human(bytes);
     }
 
     private static string FormatDuration(TimeSpan d)
@@ -281,6 +348,16 @@ public sealed class FileDiffRow
     public required string OldSize { get; init; }
     public required string BlocksReused { get; init; }
     public required long DeltaBytes { get; init; }
+}
+
+public sealed class DuplicateGroupRow
+{
+    public required string Package { get; init; }
+    public required int Copies { get; init; }
+    public required string PerCopy { get; init; }
+    public required string Reclaim { get; init; }
+    public required string ExamplePath { get; init; }
+    public required long ReclaimBytes { get; init; }
 }
 
 public sealed class LinkSpeedRow

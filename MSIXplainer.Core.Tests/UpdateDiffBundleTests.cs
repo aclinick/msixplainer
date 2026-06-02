@@ -263,11 +263,13 @@ public class UpdateDiffBundleTests
             Assert.Equal(3, result.PackageDiffs.Count);
 
             var enDiff = result.PackageDiffs.Single(p => p.Label.Contains("en-us"));
-            // Unchanged resource pack: only overhead is delta.
-            Assert.Equal(enDiff.OverheadBytes, enDiff.DeltaDownloadBytes);
+            // SDK-parity: unchanged content => zero block-delta. Overhead reported separately.
+            Assert.Equal(0, enDiff.DeltaDownloadBytes);
+            Assert.True(enDiff.OverheadBytes > 0);
 
             var frDiff = result.PackageDiffs.Single(p => p.Label.Contains("fr-fr"));
-            Assert.True(frDiff.DeltaDownloadBytes > frDiff.OverheadBytes);
+            Assert.True(frDiff.DeltaDownloadBytes > 0,
+                "Changed resource pack should have positive block-delta.");
         }
         finally
         {

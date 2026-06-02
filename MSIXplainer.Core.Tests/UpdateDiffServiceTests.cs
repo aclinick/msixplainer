@@ -115,7 +115,7 @@ public class UpdateDiffServiceTests
     // ────────────────────────────────────────────────────────────
 
     [Fact]
-    public void Identical_Packages_DeltaIsOverheadOnly()
+    public void Identical_Packages_DeltaIsZero_OverheadIsSeparate()
     {
         var oldPath = CreatePackage("1.0.0.0",
             new SyntheticFile("App.exe", Bytes("exe", 200_000)),
@@ -129,7 +129,12 @@ public class UpdateDiffServiceTests
             var result = UpdateDiffService.ComparePackages(oldPath, newPath);
             var pkg = Assert.Single(result.PackageDiffs);
 
-            Assert.Equal(pkg.OverheadBytes, pkg.DeltaDownloadBytes);
+            // SDK-parity: block-delta alone is the published "Update Impact" — zero
+            // when nothing changed. Metadata overhead (blockmap/signature/content-types)
+            // is reported separately and surfaces in TotalUpdateDownloadBytes.
+            Assert.Equal(0, pkg.DeltaDownloadBytes);
+            Assert.True(pkg.OverheadBytes > 0, "Identical packages still re-download metadata overhead.");
+            Assert.Equal(pkg.OverheadBytes, pkg.TotalUpdateDownloadBytes);
             Assert.Equal(pkg.TotalBlocks, pkg.ReusedBlocks);
             Assert.Equal(0, pkg.NewBlocks);
             Assert.All(pkg.Files, f =>
@@ -434,5 +439,86 @@ public class UpdateDiffServiceTests
         Assert.Equal(FileDiffStatus.Modified, file.Status);
         Assert.Equal(2, file.ReusedBlocks); // both hashes are in old
         Assert.Equal(0, file.DeltaBytes);   // but no new bytes — all blocks already exist
+    }
+
+    // ────────────────────────────────────────────────────────────
+    // SDK-parity metrics + duplicate detection
+    // ────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Parity_Metrics_TrackAddedDeletedModifiedUnchanged()
+    {
+        var oldPath = CreatePackage("1.0.0.0",
+            new SyntheticFile("Stable.dll", Bytes("stable", 80_000)),     // unchanged
+            new SyntheticFile("Removed.dll", Bytes("removed", 30_000)),   // deleted
+            new SyntheticFile("App.exe", Bytes("v1", 100_000)));           // modified
+        var newPath = CreatePackage("1.1.0.0",
+            new SyntheticFile("Stable.dll", Bytes("stable", 80_000)),
+            new SyntheticFile("App.exe", Bytes("v2", 120_000)),
+            new SyntheticFile("New.dll", Bytes("brand-new", 25_000)));     // added
+
+        try
+        {
+            var result = UpdateDiffService.ComparePackages(oldPath, newPath);
+            var pkg = Assert.Single(result.PackageDiffs);
+
+            Assert.Equal(25_000, pkg.AddedFilesUncompressedBytes);
+            Assert.Equal(30_000, pkg.RemovedFilesUncompressedBytes);
+            Assert.Equal(80_000, pkg.UnchangedFilesUncompressedBytes);
+            Assert.Equal(20_000, pkg.ChangedFilesNetSizeBytes); // 120k - 100k
+            Assert.Equal(80_000 + 120_000 + 25_000, pkg.NewPackageUncompressedBytes);
+            Assert.Equal(80_000 + 30_000 + 100_000, pkg.OldPackageUncompressedBytes);
+
+            // SDK-equivalent SizeDifference: AddedSize - DeletedSize + ChangedNet = 25k - 30k + 20k = 15k
+            Assert.Equal(15_000, pkg.InstalledSizeDifferenceBytes);
+        }
+        finally
+        {
+            File.Delete(oldPath);
+            File.Delete(newPath);
+        }
+    }
+
+    [Fact]
+    public void DuplicateFiles_AreDetectedAndGrouped()
+    {
+        var iconBytes = Bytes("icon-data", 20_000);
+        var oldPath = CreatePackage("1.0.0.0",
+            new SyntheticFile("App.exe", Bytes("exe", 50_000)));
+        var newPath = CreatePackage("1.1.0.0",
+            new SyntheticFile("Icons\\a.png", iconBytes),
+            new SyntheticFile("Icons\\b.png", iconBytes),
+            new SyntheticFile("Icons\\c.png", iconBytes),
+            new SyntheticFile("App.exe", Bytes("exe-v2", 60_000)));
+
+        try
+        {
+            var result = UpdateDiffService.ComparePackages(oldPath, newPath);
+            var pkg = Assert.Single(result.PackageDiffs);
+            var group = Assert.Single(pkg.DuplicateGroups);
+
+            Assert.Equal(3, group.CopyCount);
+            Assert.Equal(20_000, group.PerCopyUncompressedBytes);
+            Assert.Equal(2 * 20_000, group.PossibleSizeReductionBytes);
+            Assert.All(group.Paths, p => Assert.Contains("Icons", p));
+        }
+        finally
+        {
+            File.Delete(oldPath);
+            File.Delete(newPath);
+        }
+    }
+
+    [Fact]
+    public void FindDuplicateGroups_IgnoresUniqueAndZeroByteFiles()
+    {
+        var unique1 = new BlockMapFile { Name = "a", UncompressedSize = 100, LfhSize = 0,
+            Blocks = [new BlockMapBlock { Hash = "AAA", CompressedSize = null, Index = 0, UncompressedSize = 100 }] };
+        var unique2 = new BlockMapFile { Name = "b", UncompressedSize = 100, LfhSize = 0,
+            Blocks = [new BlockMapBlock { Hash = "BBB", CompressedSize = null, Index = 0, UncompressedSize = 100 }] };
+        var empty = new BlockMapFile { Name = "c", UncompressedSize = 0, LfhSize = 0, Blocks = [] };
+
+        var groups = UpdateDiffService.FindDuplicateGroups([unique1, unique2, empty]);
+        Assert.Empty(groups);
     }
 }
