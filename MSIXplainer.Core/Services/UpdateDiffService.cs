@@ -30,6 +30,78 @@ public static class UpdateDiffService
     ];
 
     /// <summary>
+    /// Compares two .msixbundle / .appxbundle files by pairing inner packages
+    /// on architecture (for application packages) and ResourceId (for resource
+    /// packages). Each matched pair is diffed via the block-map algorithm and
+    /// aggregated into a single result. Unmatched inner packages are surfaced
+    /// in AddedPackages / RemovedPackages.
+    /// </summary>
+    public static UpdateDiffResult CompareBundles(string oldBundlePath, string newBundlePath)
+    {
+        if (!ManifestParserService.IsBundleFile(oldBundlePath) ||
+            !ManifestParserService.IsBundleFile(newBundlePath))
+        {
+            throw new InvalidOperationException(
+                "CompareBundles requires .msixbundle/.appxbundle inputs. For single packages, use ComparePackages.");
+        }
+
+        var oldInners = BundleManifestParser.ExtractFromBundle(oldBundlePath);
+        var newInners = BundleManifestParser.ExtractFromBundle(newBundlePath);
+
+        var oldByKey = oldInners.ToDictionary(p => p.MatchKey, StringComparer.Ordinal);
+        var newByKey = newInners.ToDictionary(p => p.MatchKey, StringComparer.Ordinal);
+
+        var packageDiffs = new List<PackageDiff>();
+        var added = new List<string>();
+        var removed = new List<string>();
+
+        // Open both bundle ZIPs once for the duration of the diff.
+        using var oldArchive = ZipFile.OpenRead(oldBundlePath);
+        using var newArchive = ZipFile.OpenRead(newBundlePath);
+
+        foreach (var newInner in newInners)
+        {
+            if (!oldByKey.TryGetValue(newInner.MatchKey, out var oldInner))
+            {
+                added.Add(newInner.Label);
+                continue;
+            }
+
+            var oldBlockMap = ReadInnerBlockMap(oldArchive, oldInner.FileName);
+            var newBlockMap = ReadInnerBlockMap(newArchive, newInner.FileName);
+            var newOverhead = MeasureInnerOverheadBytes(newArchive, newInner.FileName);
+
+            packageDiffs.Add(DiffBlockMaps(
+                label: newInner.Label,
+                oldVersion: oldInner.Version,
+                newVersion: newInner.Version,
+                architecture: newInner.Architecture,
+                oldFiles: oldBlockMap,
+                newFiles: newBlockMap,
+                overheadBytes: newOverhead,
+                fullDownloadBytesOverride: newInner.Size > 0 ? newInner.Size : null));
+        }
+
+        foreach (var oldInner in oldInners)
+        {
+            if (!newByKey.ContainsKey(oldInner.MatchKey))
+                removed.Add(oldInner.Label);
+        }
+
+        var warnings = BuildBundleLevelWarnings(oldInners, newInners);
+
+        return new UpdateDiffResult
+        {
+            OldLabel = Path.GetFileName(oldBundlePath),
+            NewLabel = Path.GetFileName(newBundlePath),
+            PackageDiffs = packageDiffs,
+            AddedPackages = added,
+            RemovedPackages = removed,
+            Warnings = warnings
+        };
+    }
+
+    /// <summary>
     /// Compares two single MSIX/APPX packages (not bundles) and returns the diff.
     /// Throws if a path points at a bundle or a file missing the block map.
     /// </summary>
@@ -215,6 +287,20 @@ public static class UpdateDiffService
     internal static long MeasureOverheadBytes(string packagePath)
     {
         using var archive = ZipFile.OpenRead(packagePath);
+        return MeasureOverheadBytesInArchive(archive);
+    }
+
+    /// <summary>
+    /// Overhead measurement for an inner .msix entry within an open bundle archive.
+    /// </summary>
+    internal static long MeasureInnerOverheadBytes(ZipArchive bundleArchive, string innerFileName)
+    {
+        using var innerArchive = OpenInnerArchive(bundleArchive, innerFileName);
+        return MeasureOverheadBytesInArchive(innerArchive);
+    }
+
+    private static long MeasureOverheadBytesInArchive(ZipArchive archive)
+    {
         long total = 0;
         foreach (var name in FixedOverheadEntries)
         {
@@ -222,6 +308,38 @@ public static class UpdateDiffService
             if (entry is not null) total += entry.CompressedLength;
         }
         return total;
+    }
+
+    private static IReadOnlyList<BlockMapFile> ReadInnerBlockMap(ZipArchive bundleArchive, string innerFileName)
+    {
+        using var innerArchive = OpenInnerArchive(bundleArchive, innerFileName);
+        return BlockMapParser.ExtractFromArchive(innerArchive);
+    }
+
+    /// <summary>
+    /// Opens an inner .msix entry inside a bundle as its own in-memory ZIP archive.
+    /// Caller is responsible for disposing the returned archive (its backing MemoryStream
+    /// is owned by the archive).
+    /// </summary>
+    private static ZipArchive OpenInnerArchive(ZipArchive bundleArchive, string innerFileName)
+    {
+        var entry = bundleArchive.GetEntry(innerFileName)
+            ?? throw new InvalidOperationException(
+                $"Bundle does not contain expected inner package '{innerFileName}'.");
+
+        // Guard: skip unreasonably large inner packages (500 MB), matching the
+        // limit used by ManifestParserService.ExtractFromBundle.
+        if (entry.Length > 500 * 1024 * 1024)
+            throw new InvalidOperationException(
+                $"Inner package '{innerFileName}' exceeds 500 MB — refusing to process.");
+
+        var memory = new MemoryStream(capacity: (int)Math.Min(entry.Length, int.MaxValue));
+        using (var s = entry.Open())
+        {
+            s.CopyTo(memory);
+        }
+        memory.Position = 0;
+        return new ZipArchive(memory, ZipArchiveMode.Read, leaveOpen: false);
     }
 
     private static IReadOnlyList<string> BuildPackageLevelWarnings(PackageInfo oldInfo, PackageInfo newInfo)
@@ -243,6 +361,26 @@ public static class UpdateDiffService
         {
             warnings.Add($"New version ({newInfo.Version}) is not greater than old version ({oldInfo.Version}). Windows will refuse to apply this as an update.");
         }
+
+        return warnings;
+    }
+
+    private static IReadOnlyList<string> BuildBundleLevelWarnings(
+        IReadOnlyList<BundleInnerPackage> oldInners,
+        IReadOnlyList<BundleInnerPackage> newInners)
+    {
+        var warnings = new List<string>();
+
+        var oldArchs = oldInners.Where(p => p.IsApplication).Select(p => p.Architecture).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var newArchs = newInners.Where(p => p.IsApplication).Select(p => p.Architecture).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var droppedArchs = oldArchs.Except(newArchs, StringComparer.OrdinalIgnoreCase).ToList();
+        if (droppedArchs.Count > 0)
+            warnings.Add($"New bundle no longer ships these architectures: {string.Join(", ", droppedArchs)}. Devices on those architectures will not receive an update.");
+
+        var addedArchs = newArchs.Except(oldArchs, StringComparer.OrdinalIgnoreCase).ToList();
+        if (addedArchs.Count > 0)
+            warnings.Add($"New bundle adds these architectures: {string.Join(", ", addedArchs)}. Devices newly covered will perform a full install rather than a delta update.");
 
         return warnings;
     }
