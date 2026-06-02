@@ -11,15 +11,27 @@ static class Program
     {
         Console.OutputEncoding = Encoding.UTF8;
 
-        if (args.Length == 0 || args.Contains("--help") || args.Contains("-h"))
+        if (args.Length == 0)
         {
             PrintUsage();
             return 0;
         }
 
+        // Subcommands handle their own --help.
         if (string.Equals(args[0], "rules", StringComparison.OrdinalIgnoreCase))
         {
             return RunRulesSubcommand(args.Skip(1).ToArray());
+        }
+
+        if (string.Equals(args[0], "diff", StringComparison.OrdinalIgnoreCase))
+        {
+            return DiffCommand.Run(args.Skip(1).ToArray());
+        }
+
+        if (args.Contains("--help") || args.Contains("-h"))
+        {
+            PrintUsage();
+            return 0;
         }
 
         var options = ParseArgs(args);
@@ -572,6 +584,14 @@ static class Program
         table.AddRow("  msixplainer rules list", "Show all rule IDs and their default/effective severity");
         table.AddRow("", $"[grey]Auto-loaded:[/] {Markup.Escape(RuleSeverityOverrides.DefaultUserPath)}");
         table.AddRow("", "");
+        table.AddRow("[cyan bold]Update impact (diff between two versions):[/]", "");
+        table.AddRow("  msixplainer diff [grey]<old> <new>[/]", "Show update download size between two packages or bundles");
+        table.AddRow("  [grey]--devices N[/]", "Devices in the rollout (enables bandwidth planner)");
+        table.AddRow("  [grey]--link 100,1000[/]", "Link speeds in Mbps (comma separated, default 100,1000)");
+        table.AddRow("  [grey]--cost 0.08[/]", "Egress cost per GB (USD)");
+        table.AddRow("  [grey]--top N[/]", "Show top N changed files (default 25)");
+        table.AddRow("  [grey]--markdown[/] / [grey]--json[/] / [grey]-o <file>[/]", "Same output options as analyse");
+        table.AddRow("", "");
         table.AddRow("[cyan bold]Exit codes:[/]", "");
         table.AddRow("  [green]0[/]", "No warnings or critical findings");
         table.AddRow("  [yellow]1[/]", "One or more warnings");
@@ -583,6 +603,9 @@ static class Program
         table.AddRow("  msixplainer app.msix --markdown -o review.md", "Save Markdown report");
         table.AddRow("  msixplainer *.msix --severity warning", "Only warnings+critical");
         table.AddRow("  msixplainer app.msix -q && echo PASS", "CI gate check");
+        table.AddRow("  msixplainer diff v1.0.msix v1.1.msix", "Show update download size");
+        table.AddRow("  msixplainer diff v1.0.msix v1.1.msix --devices 500", "With bandwidth planner");
+        table.AddRow("  msixplainer diff v1.0.msix v1.1.msix --markdown -o update.md", "Save Markdown report");
 
         AnsiConsole.Write(table);
         AnsiConsole.WriteLine();
