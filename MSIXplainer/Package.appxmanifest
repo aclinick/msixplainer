@@ -12,7 +12,7 @@
   <Identity
     Name="46554Paymynanny.com.MSIXplainer"
     Publisher="CN=719329FB-9634-4D88-B827-2EC302E15BD0"
-    Version="1.0.11.0" />
+    Version="1.0.14.0" />
 
   <mp:PhoneIdentity PhoneProductId="3a09e9f9-55b1-418a-9e63-9a662f1a29bc" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
 
@@ -54,8 +54,7 @@
         Description="MSIXplainer command line interface"
         BackgroundColor="transparent"
         Square150x150Logo="Assets\Square150x150Logo.png"
-        Square44x44Logo="Assets\Square44x44Logo.png"
-        AppListEntry="none">
+        Square44x44Logo="Assets\Square44x44Logo.png">
         <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" />
         <uap:SplashScreen Image="Assets\SplashScreen.png" />
       </uap:VisualElements>
