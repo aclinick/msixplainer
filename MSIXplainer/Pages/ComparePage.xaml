@@ -254,13 +254,19 @@
                             <ListView ItemsSource="{x:Bind ViewModel.LinkProjections}"
                                       SelectionMode="None"
                                       IsItemClickEnabled="False">
+                                <ListView.ItemContainerStyle>
+                                    <Style TargetType="ListViewItem">
+                                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                        <Setter Property="Padding" Value="12,6" />
+                                    </Style>
+                                </ListView.ItemContainerStyle>
                                 <ListView.HeaderTemplate>
                                     <DataTemplate>
                                         <Grid ColumnSpacing="16" Padding="12,8">
                                             <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="140" />
+                                                <ColumnDefinition Width="160" />
                                                 <ColumnDefinition Width="*" />
-                                                <ColumnDefinition Width="*" />
-                                                <ColumnDefinition Width="2*" />
                                             </Grid.ColumnDefinitions>
                                             <TextBlock Grid.Column="0" Text="Link"
                                                        Style="{StaticResource BodyStrongTextBlockStyle}" />
@@ -275,9 +281,9 @@
                                     <DataTemplate x:DataType="vm:LinkSpeedRow">
                                         <Grid ColumnSpacing="16">
                                             <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="140" />
+                                                <ColumnDefinition Width="160" />
                                                 <ColumnDefinition Width="*" />
-                                                <ColumnDefinition Width="*" />
-                                                <ColumnDefinition Width="2*" />
                                             </Grid.ColumnDefinitions>
                                             <TextBlock Grid.Column="0" Text="{x:Bind Link}" />
                                             <TextBlock Grid.Column="1" Text="{x:Bind PerDevice}" />
@@ -356,50 +362,84 @@
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
 
-                    <TextBlock Text="Top contributors to the update download"
-                               Style="{StaticResource SubtitleTextBlockStyle}" />
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="Top contributors to the update download"
+                                   Style="{StaticResource SubtitleTextBlockStyle}"
+                                   VerticalAlignment="Center" />
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                            <Button AutomationProperties.AutomationId="BtnExportMarkdown"
+                                    Command="{x:Bind ViewModel.ExportMarkdownCommand}"
+                                    Style="{StaticResource SubtleButtonStyle}">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <FontIcon Glyph="&#xE8A5;" FontSize="14" />
+                                    <TextBlock Text="Export Markdown" />
+                                </StackPanel>
+                            </Button>
+                            <Button AutomationProperties.AutomationId="BtnExportJson"
+                                    Command="{x:Bind ViewModel.ExportJsonCommand}"
+                                    Style="{StaticResource SubtleButtonStyle}">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <FontIcon Glyph="&#xE943;" FontSize="14" />
+                                    <TextBlock Text="Export JSON" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </Grid>
                     <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                Text="Up to 50 files sorted by on-wire delta. These are the files driving the update size." />
                     <ListView ItemsSource="{x:Bind ViewModel.TopFileChanges}"
                               SelectionMode="None">
+                        <ListView.ItemContainerStyle>
+                            <Style TargetType="ListViewItem">
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                <Setter Property="Padding" Value="12,6" />
+                            </Style>
+                        </ListView.ItemContainerStyle>
                         <ListView.HeaderTemplate>
                             <DataTemplate>
-                                <Grid ColumnSpacing="12" Padding="12,8">
+                                <Grid ColumnSpacing="16" Padding="12,8">
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="2*" />
-                                        <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="100" />
+                                        <ColumnDefinition Width="120" />
+                                        <ColumnDefinition Width="120" />
+                                        <ColumnDefinition Width="120" />
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Grid.Column="0" Text="File"
                                                Style="{StaticResource BodyStrongTextBlockStyle}" />
                                     <TextBlock Grid.Column="1" Text="Status"
                                                Style="{StaticResource BodyStrongTextBlockStyle}" />
                                     <TextBlock Grid.Column="2" Text="Delta on wire"
+                                               HorizontalAlignment="Right"
                                                Style="{StaticResource BodyStrongTextBlockStyle}" />
                                     <TextBlock Grid.Column="3" Text="New size"
+                                               HorizontalAlignment="Right"
                                                Style="{StaticResource BodyStrongTextBlockStyle}" />
                                     <TextBlock Grid.Column="4" Text="Blocks reused"
+                                               HorizontalAlignment="Right"
                                                Style="{StaticResource BodyStrongTextBlockStyle}" />
                                 </Grid>
                             </DataTemplate>
                         </ListView.HeaderTemplate>
                         <ListView.ItemTemplate>
                             <DataTemplate x:DataType="vm:FileDiffRow">
-                                <Grid ColumnSpacing="12">
+                                <Grid ColumnSpacing="16">
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="2*" />
-                                        <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="100" />
+                                        <ColumnDefinition Width="120" />
+                                        <ColumnDefinition Width="120" />
+                                        <ColumnDefinition Width="120" />
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Grid.Column="0" Text="{x:Bind Path}" TextTrimming="CharacterEllipsis" />
                                     <TextBlock Grid.Column="1" Text="{x:Bind Status}" />
-                                    <TextBlock Grid.Column="2" Text="{x:Bind Delta}" />
-                                    <TextBlock Grid.Column="3" Text="{x:Bind NewSize}" />
-                                    <TextBlock Grid.Column="4" Text="{x:Bind BlocksReused}" />
+                                    <TextBlock Grid.Column="2" Text="{x:Bind Delta}" HorizontalAlignment="Right" />
+                                    <TextBlock Grid.Column="3" Text="{x:Bind NewSize}" HorizontalAlignment="Right" />
+                                    <TextBlock Grid.Column="4" Text="{x:Bind BlocksReused}" HorizontalAlignment="Right" />
                                 </Grid>
                             </DataTemplate>
                         </ListView.ItemTemplate>

@@ -49,12 +49,43 @@ public partial class ComparePageViewModel : ObservableObject
     public ObservableCollection<LinkSpeedRow> LinkProjections { get; } = [];
 
     private UpdateDiffResult? _lastResult;
+    private BandwidthEstimate? _lastBandwidth;
 
     [RelayCommand]
     private async Task PickOldAsync() => OldPath = await PickPackageFileAsync() ?? OldPath;
 
     [RelayCommand]
     private async Task PickNewAsync() => NewPath = await PickPackageFileAsync() ?? NewPath;
+
+    [RelayCommand]
+    private async Task ExportMarkdownAsync()
+    {
+        if (_lastResult is null) return;
+        var content = DiffExportService.ExportToMarkdown(_lastResult, _lastBandwidth, topFiles: 50);
+        await SaveExportAsync(content, "Markdown", ".md", "MSIXplainer-diff.md");
+    }
+
+    [RelayCommand]
+    private async Task ExportJsonAsync()
+    {
+        if (_lastResult is null) return;
+        var content = DiffExportService.ExportToJson(_lastResult, _lastBandwidth);
+        await SaveExportAsync(content, "JSON", ".json", "MSIXplainer-diff.json");
+    }
+
+    private static async Task SaveExportAsync(string content, string typeName, string ext, string suggestedName)
+    {
+        var windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(App.WindowHandle);
+        var picker = new FileSavePicker(windowId)
+        {
+            SuggestedFileName = suggestedName,
+            SuggestedStartLocation = PickerLocationId.DocumentsLibrary
+        };
+        picker.FileTypeChoices.Add(typeName, [ext]);
+        var file = await picker.PickSaveFileAsync();
+        if (file is null) return;
+        await File.WriteAllTextAsync(file.Path, content);
+    }
 
     [RelayCommand]
     private void Compare()
@@ -99,7 +130,7 @@ public partial class ComparePageViewModel : ObservableObject
 
     private void RecalculateBandwidth()
     {
-        if (_lastResult is null) { HasBandwidth = false; return; }
+        if (_lastResult is null) { HasBandwidth = false; _lastBandwidth = null; return; }
 
         var links = ParseLinkSpeeds(LinkSpeedsText);
         if (links.Count == 0 || DeviceCount < 1)
@@ -115,6 +146,7 @@ public partial class ComparePageViewModel : ObservableObject
                 deviceCount: DeviceCount,
                 linkSpeedsMbps: links,
                 costPerGigabyteUsd: CostPerGb > 0 ? CostPerGb : null);
+            _lastBandwidth = bw;
 
             TotalTransferDisplay = $"{Human(bw.TotalBytes)} ({bw.TotalBytes:N0} bytes)";
             EstimatedCostDisplay = bw.EstimatedCostUsd is { } c
