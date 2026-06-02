@@ -41,6 +41,14 @@
                         <TextBlock Text="Open Sample" />
                     </StackPanel>
                 </Button>
+                <Button AutomationProperties.AutomationId="BtnCompareVersions"
+                        Click="OnCompareVersionsClick"
+                        Style="{StaticResource SubtleButtonStyle}">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <FontIcon Glyph="&#xE8AB;" FontSize="16" />
+                        <TextBlock Text="Compare Versions" />
+                    </StackPanel>
+                </Button>
             </StackPanel>
 
             <TextBlock Grid.Column="1"

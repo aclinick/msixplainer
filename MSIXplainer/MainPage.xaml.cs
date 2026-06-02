@@ -85,6 +85,11 @@ public sealed partial class MainPage : Page
             ViewModel.SelectedFinding = finding;
     }
 
+    private void OnCompareVersionsClick(object sender, RoutedEventArgs e)
+    {
+        Frame.Navigate(typeof(Pages.ComparePage));
+    }
+
     // ── x:Bind helper functions ──
 
     public static Visibility BoolToVisibility(bool value) =>

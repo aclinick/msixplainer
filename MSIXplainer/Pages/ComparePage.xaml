@@ -1,0 +1,412 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Page
+    x:Class="MSIXplainer.Pages.ComparePage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:vm="using:MSIXplainer.ViewModels"
+    xmlns:local="using:MSIXplainer.Pages"
+    xmlns:models="using:MSIXplainer.Models"
+    mc:Ignorable="d">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- ═══ Toolbar ═══ -->
+        <Grid Grid.Row="0" Padding="16,12" ColumnSpacing="8"
+              BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+              BorderThickness="0,0,0,1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8">
+                <Button AutomationProperties.AutomationId="BtnBackToAnalyse"
+                        Click="OnBackClick"
+                        Style="{StaticResource SubtleButtonStyle}">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <FontIcon Glyph="&#xE72B;" FontSize="16" />
+                        <TextBlock Text="Back to Analyse" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+
+            <TextBlock Grid.Column="1"
+                       Text="Compare Versions"
+                       VerticalAlignment="Center"
+                       HorizontalAlignment="Center"
+                       Style="{StaticResource SubtitleTextBlockStyle}" />
+        </Grid>
+
+        <ScrollViewer Grid.Row="1" Padding="24" VerticalScrollBarVisibility="Auto">
+            <StackPanel Spacing="20" MaxWidth="1100" HorizontalAlignment="Stretch">
+
+                <TextBlock Text="Estimate the on-wire download size of an MSIX update"
+                           Style="{StaticResource TitleTextBlockStyle}" />
+                <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                           TextWrapping="Wrap"
+                           Text="Pick the currently installed package version and a newer version. MSIXplainer reads the AppxBlockMap of each and reports exactly which blocks must travel over the wire — the same block-reuse mechanism the platform uses for updates." />
+
+                <Grid ColumnSpacing="16" RowSpacing="12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Grid.Column="0"
+                               Text="Old version (currently installed)"
+                               Style="{StaticResource BodyStrongTextBlockStyle}" />
+                    <TextBlock Grid.Row="0" Grid.Column="1"
+                               Text="New version (target)"
+                               Style="{StaticResource BodyStrongTextBlockStyle}" />
+
+                    <Grid Grid.Row="1" Grid.Column="0" ColumnSpacing="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBox Grid.Column="0"
+                                 AutomationProperties.AutomationId="OldPathBox"
+                                 PlaceholderText="Path to old .msix / .msixbundle"
+                                 Text="{x:Bind ViewModel.OldPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        <Button Grid.Column="1"
+                                AutomationProperties.AutomationId="BtnPickOld"
+                                Command="{x:Bind ViewModel.PickOldCommand}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon Glyph="&#xE8E5;" FontSize="14" />
+                                <TextBlock Text="Browse" />
+                            </StackPanel>
+                        </Button>
+                    </Grid>
+
+                    <Grid Grid.Row="1" Grid.Column="1" ColumnSpacing="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBox Grid.Column="0"
+                                 AutomationProperties.AutomationId="NewPathBox"
+                                 PlaceholderText="Path to new .msix / .msixbundle"
+                                 Text="{x:Bind ViewModel.NewPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        <Button Grid.Column="1"
+                                AutomationProperties.AutomationId="BtnPickNew"
+                                Command="{x:Bind ViewModel.PickNewCommand}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon Glyph="&#xE8E5;" FontSize="14" />
+                                <TextBlock Text="Browse" />
+                            </StackPanel>
+                        </Button>
+                    </Grid>
+                </Grid>
+
+                <Button AutomationProperties.AutomationId="BtnCompare"
+                        Command="{x:Bind ViewModel.CompareCommand}"
+                        Style="{StaticResource AccentButtonStyle}"
+                        HorizontalAlignment="Left">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <FontIcon Glyph="&#xE8AB;" FontSize="16" />
+                        <TextBlock Text="Compare" />
+                    </StackPanel>
+                </Button>
+
+                <InfoBar IsOpen="{x:Bind ViewModel.HasError, Mode=OneWay}"
+                         Severity="Error"
+                         Title="Comparison failed"
+                         Message="{x:Bind ViewModel.ErrorMessage, Mode=OneWay}"
+                         IsClosable="False" />
+
+                <ProgressRing IsActive="{x:Bind ViewModel.IsBusy, Mode=OneWay}"
+                              Visibility="{x:Bind local:ComparePage.BoolToVisibility(ViewModel.IsBusy), Mode=OneWay}"
+                              HorizontalAlignment="Left" />
+
+                <StackPanel Spacing="20"
+                            Visibility="{x:Bind local:ComparePage.BoolToVisibility(ViewModel.HasResult), Mode=OneWay}">
+
+                    <Border Background="{ThemeResource LayerFillColorDefaultBrush}"
+                            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                            BorderThickness="1"
+                            CornerRadius="8"
+                            Padding="20">
+                        <Grid ColumnSpacing="24" RowSpacing="8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Full download (fresh install)"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            <TextBlock Grid.Row="0" Grid.Column="1" Text="Update download"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            <TextBlock Grid.Row="0" Grid.Column="2" Text="Bandwidth saved"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+
+                            <TextBlock Grid.Row="1" Grid.Column="0"
+                                       Text="{x:Bind ViewModel.FullDownloadDisplay, Mode=OneWay}"
+                                       Style="{StaticResource SubtitleTextBlockStyle}" />
+                            <TextBlock Grid.Row="1" Grid.Column="1"
+                                       AutomationProperties.AutomationId="DeltaDownloadDisplay"
+                                       Text="{x:Bind ViewModel.DeltaDownloadDisplay, Mode=OneWay}"
+                                       Style="{StaticResource SubtitleTextBlockStyle}" />
+                            <TextBlock Grid.Row="1" Grid.Column="2"
+                                       AutomationProperties.AutomationId="SavingsDisplay"
+                                       Text="{x:Bind ViewModel.SavingsDisplay, Mode=OneWay}"
+                                       Style="{StaticResource SubtitleTextBlockStyle}"
+                                       Foreground="{ThemeResource SystemFillColorSuccessBrush}" />
+
+                            <TextBlock Grid.Row="2" Grid.Column="0"
+                                       Text="{x:Bind ViewModel.OldLabel, Mode=OneWay}"
+                                       Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                            <TextBlock Grid.Row="2" Grid.Column="1"
+                                       Text="{x:Bind ViewModel.NewLabel, Mode=OneWay}"
+                                       Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                        </Grid>
+                    </Border>
+
+                    <ItemsControl ItemsSource="{x:Bind ViewModel.Warnings}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="x:String">
+                                <InfoBar IsOpen="True" Severity="Warning" Title="Warning"
+                                         Message="{x:Bind}" IsClosable="False"
+                                         Margin="0,0,0,8" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <TextBlock Text="Bandwidth Planner"
+                               Style="{StaticResource SubtitleTextBlockStyle}" />
+                    <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                               TextWrapping="Wrap"
+                               Text="Multiply per-device download by your fleet size and project against typical link speeds." />
+
+                    <Grid ColumnSpacing="16" RowSpacing="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Device count" />
+                        <NumberBox Grid.Row="1" Grid.Column="0"
+                                   AutomationProperties.AutomationId="DeviceCountBox"
+                                   Value="{x:Bind ViewModel.DeviceCount, Mode=TwoWay}"
+                                   Minimum="1"
+                                   SpinButtonPlacementMode="Inline" />
+
+                        <TextBlock Grid.Row="0" Grid.Column="1" Text="Link speeds (Mbps, comma-separated)" />
+                        <TextBox Grid.Row="1" Grid.Column="1"
+                                 AutomationProperties.AutomationId="LinkSpeedsBox"
+                                 Text="{x:Bind ViewModel.LinkSpeedsText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+                        <TextBlock Grid.Row="0" Grid.Column="2" Text="Cost per GB (USD, 0 = ignore)" />
+                        <NumberBox Grid.Row="1" Grid.Column="2"
+                                   AutomationProperties.AutomationId="CostPerGbBox"
+                                   Value="{x:Bind ViewModel.CostPerGb, Mode=TwoWay}"
+                                   Minimum="0"
+                                   SmallChange="0.01"
+                                   LargeChange="0.10" />
+                    </Grid>
+
+                    <Border Background="{ThemeResource LayerFillColorDefaultBrush}"
+                            BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                            BorderThickness="1"
+                            CornerRadius="8"
+                            Padding="20"
+                            Visibility="{x:Bind local:ComparePage.BoolToVisibility(ViewModel.HasBandwidth), Mode=OneWay}">
+                        <StackPanel Spacing="12">
+                            <Grid ColumnSpacing="24">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" Spacing="4">
+                                    <TextBlock Text="Total fleet transfer"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    <TextBlock Text="{x:Bind ViewModel.TotalTransferDisplay, Mode=OneWay}"
+                                               Style="{StaticResource BodyStrongTextBlockStyle}" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Spacing="4">
+                                    <TextBlock Text="Estimated egress cost"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    <TextBlock Text="{x:Bind ViewModel.EstimatedCostDisplay, Mode=OneWay}"
+                                               Style="{StaticResource BodyStrongTextBlockStyle}" />
+                                </StackPanel>
+                            </Grid>
+
+                            <ListView ItemsSource="{x:Bind ViewModel.LinkProjections}"
+                                      SelectionMode="None"
+                                      IsItemClickEnabled="False">
+                                <ListView.HeaderTemplate>
+                                    <DataTemplate>
+                                        <Grid ColumnSpacing="16" Padding="12,8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="2*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="Link"
+                                                       Style="{StaticResource BodyStrongTextBlockStyle}" />
+                                            <TextBlock Grid.Column="1" Text="Per device"
+                                                       Style="{StaticResource BodyStrongTextBlockStyle}" />
+                                            <TextBlock Grid.Column="2" Text="Serial fleet (worst case)"
+                                                       Style="{StaticResource BodyStrongTextBlockStyle}" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListView.HeaderTemplate>
+                                <ListView.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:LinkSpeedRow">
+                                        <Grid ColumnSpacing="16">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="2*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="{x:Bind Link}" />
+                                            <TextBlock Grid.Column="1" Text="{x:Bind PerDevice}" />
+                                            <TextBlock Grid.Column="2" Text="{x:Bind SerialFleet}" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListView.ItemTemplate>
+                            </ListView>
+                        </StackPanel>
+                    </Border>
+
+                    <TextBlock Text="Per-package breakdown"
+                               Style="{StaticResource SubtitleTextBlockStyle}" />
+                    <ItemsControl ItemsSource="{x:Bind ViewModel.PackageDiffs}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="models:PackageDiff">
+                                <Border Background="{ThemeResource LayerFillColorDefaultBrush}"
+                                        BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="6"
+                                        Padding="16"
+                                        Margin="0,0,0,12">
+                                    <StackPanel Spacing="6">
+                                        <TextBlock Text="{x:Bind Label}" Style="{StaticResource BodyStrongTextBlockStyle}" />
+                                        <Grid ColumnSpacing="16">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0">
+                                                <TextBlock Text="Old version" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                <TextBlock Text="{x:Bind OldVersion}" />
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1">
+                                                <TextBlock Text="New version" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                <TextBlock Text="{x:Bind NewVersion}" />
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="2">
+                                                <TextBlock Text="Architecture" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                <TextBlock Text="{x:Bind Architecture}" />
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="3">
+                                                <TextBlock Text="Reuse" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                <TextBlock Text="{x:Bind local:ComparePage.PercentToString(SavingsPercent)}" />
+                                            </StackPanel>
+                                        </Grid>
+                                        <Grid ColumnSpacing="16">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0">
+                                                <TextBlock Text="Added files" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                <TextBlock Text="{x:Bind AddedFileCount}" />
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1">
+                                                <TextBlock Text="Modified" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                <TextBlock Text="{x:Bind ModifiedFileCount}" />
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="2">
+                                                <TextBlock Text="Removed" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                <TextBlock Text="{x:Bind RemovedFileCount}" />
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="3">
+                                                <TextBlock Text="Unchanged" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                <TextBlock Text="{x:Bind UnchangedFileCount}" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <TextBlock Text="Top contributors to the update download"
+                               Style="{StaticResource SubtitleTextBlockStyle}" />
+                    <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                               Text="Up to 50 files sorted by on-wire delta. These are the files driving the update size." />
+                    <ListView ItemsSource="{x:Bind ViewModel.TopFileChanges}"
+                              SelectionMode="None">
+                        <ListView.HeaderTemplate>
+                            <DataTemplate>
+                                <Grid ColumnSpacing="12" Padding="12,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="2*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="File"
+                                               Style="{StaticResource BodyStrongTextBlockStyle}" />
+                                    <TextBlock Grid.Column="1" Text="Status"
+                                               Style="{StaticResource BodyStrongTextBlockStyle}" />
+                                    <TextBlock Grid.Column="2" Text="Delta on wire"
+                                               Style="{StaticResource BodyStrongTextBlockStyle}" />
+                                    <TextBlock Grid.Column="3" Text="New size"
+                                               Style="{StaticResource BodyStrongTextBlockStyle}" />
+                                    <TextBlock Grid.Column="4" Text="Blocks reused"
+                                               Style="{StaticResource BodyStrongTextBlockStyle}" />
+                                </Grid>
+                            </DataTemplate>
+                        </ListView.HeaderTemplate>
+                        <ListView.ItemTemplate>
+                            <DataTemplate x:DataType="vm:FileDiffRow">
+                                <Grid ColumnSpacing="12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="2*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="{x:Bind Path}" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Grid.Column="1" Text="{x:Bind Status}" />
+                                    <TextBlock Grid.Column="2" Text="{x:Bind Delta}" />
+                                    <TextBlock Grid.Column="3" Text="{x:Bind NewSize}" />
+                                    <TextBlock Grid.Column="4" Text="{x:Bind BlocksReused}" />
+                                </Grid>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+
+                </StackPanel>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</Page>
