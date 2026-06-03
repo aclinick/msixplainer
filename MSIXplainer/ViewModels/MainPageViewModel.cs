@@ -79,7 +79,33 @@ public partial class MainPageViewModel : ObservableObject
     [ObservableProperty]
     public partial bool IsCompareMode { get; set; }
 
-    partial void OnIsCompareModeChanged(bool value) => RecomputeSectionsPaneVisibility();
+    partial void OnIsCompareModeChanged(bool value)
+    {
+        RecomputeSectionsPaneVisibility();
+        IsHomeMode = !IsCompareMode && !IsSettingsMode;
+    }
+
+    /// <summary>
+    /// When true, the content area shows the Settings page (inner Frame) instead
+    /// of the welcome/analysis or Compare content. Mutually exclusive with
+    /// <see cref="IsCompareMode"/>; both must be false for the home/analysis
+    /// content to render.
+    /// </summary>
+    [ObservableProperty]
+    public partial bool IsSettingsMode { get; set; }
+
+    partial void OnIsSettingsModeChanged(bool value)
+    {
+        RecomputeSectionsPaneVisibility();
+        IsHomeMode = !IsCompareMode && !IsSettingsMode;
+    }
+
+    /// <summary>
+    /// True when neither Compare nor Settings is active — i.e. the welcome /
+    /// analysis content should be shown.
+    /// </summary>
+    [ObservableProperty]
+    public partial bool IsHomeMode { get; set; } = true;
 
     /// <summary>
     /// When true, the Apps secondary pane (Outlook-style second column) is visible
@@ -115,7 +141,7 @@ public partial class MainPageViewModel : ObservableObject
     }
 
     private void RecomputeSectionsPaneVisibility() =>
-        IsSectionsPaneVisible = IsPackageLoaded && !IsCompareMode && !IsAppsPaneOpen;
+        IsSectionsPaneVisible = IsPackageLoaded && !IsCompareMode && !IsSettingsMode && !IsAppsPaneOpen;
 
     private List<ManifestFinding> _allFindings = [];
     private XElement? _manifestRoot;

@@ -68,5 +68,8 @@ public partial class App : Application
         Window = new MainWindow();
         DispatcherQueue = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
         Window.Activate();
+        // Apply persisted theme after Window.Content is set so the FrameworkElement
+        // root exists. ThemeService.Apply no-ops if Content is still null.
+        MSIXplainer.Services.ThemeService.Apply(MSIXplainer.Services.ThemeService.LoadPreference());
     }
 }

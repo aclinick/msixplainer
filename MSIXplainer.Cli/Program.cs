@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.Text;
 using MSIXplainer.Models;
 using MSIXplainer.Services;
@@ -14,6 +15,12 @@ static class Program
         if (args.Length == 0)
         {
             PrintUsage();
+            return 0;
+        }
+
+        if (args.Contains("--version") || args.Contains("-v"))
+        {
+            AnsiConsole.MarkupLine($"MSIXplainer [cyan]{Markup.Escape(GetVersion())}[/]");
             return 0;
         }
 
@@ -561,6 +568,8 @@ static class Program
     static void PrintUsage()
     {
         AnsiConsole.Write(new FigletText("MSIXplainer").Color(Color.CornflowerBlue));
+        AnsiConsole.MarkupLine($"  [grey]Version[/] [cyan]{Markup.Escape(GetVersion())}[/]");
+        AnsiConsole.WriteLine();
 
         var table = new Table()
             .Border(TableBorder.None)
@@ -613,6 +622,23 @@ static class Program
 
         AnsiConsole.Write(table);
         AnsiConsole.WriteLine();
+    }
+
+    /// <summary>
+    /// Returns the assembly informational/file version, e.g. "1.0.19.0". Used by
+    /// the banner and `--version`. Falls back to "unknown" if reflection fails.
+    /// </summary>
+    static string GetVersion()
+    {
+        var asm = typeof(Program).Assembly;
+        var info = asm.GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+        if (!string.IsNullOrWhiteSpace(info))
+        {
+            // Strip +sha suffix that SDK appends for SourceLink
+            var plus = info.IndexOf('+');
+            return plus > 0 ? info[..plus] : info;
+        }
+        return asm.GetName().Version?.ToString() ?? "unknown";
     }
 }
 

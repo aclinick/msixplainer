@@ -232,8 +232,12 @@
             <Frame x:Name="CompareFrame"
                    Visibility="{x:Bind local:MainPage.BoolToVisibility(ViewModel.IsCompareMode), Mode=OneWay}" />
 
-            <!-- ── Home content (welcome + analysis); hidden in Compare mode ── -->
-            <Grid Visibility="{x:Bind local:MainPage.InvertBoolToVisibility(ViewModel.IsCompareMode), Mode=OneWay}">
+            <!-- ── Settings view (inner-frame; visible only in Settings mode) ── -->
+            <Frame x:Name="SettingsFrame"
+                   Visibility="{x:Bind local:MainPage.BoolToVisibility(ViewModel.IsSettingsMode), Mode=OneWay}" />
+
+            <!-- ── Home content (welcome + analysis); hidden in Compare or Settings mode ── -->
+            <Grid Visibility="{x:Bind local:MainPage.BoolToVisibility(ViewModel.IsHomeMode), Mode=OneWay}">
 
             <!-- Welcome state -->
             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="16"

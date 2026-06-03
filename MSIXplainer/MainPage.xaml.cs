@@ -19,9 +19,10 @@ public sealed partial class MainPage : Page
     // The top-level NavView only shows two static entry points (Apps, Compare).
     // "Open package from disk…" lives inside the Apps pane as a primary action
     // alongside the installed-apps list, since both are ways of picking a
-    // package to analyze.
+    // package to analyze. Settings lives in the footer rail.
     private NavigationViewItem? _appsItem;
     private NavigationViewItem? _compareItem;
+    private NavigationViewItem? _settingsItem;
 
     public MainPage()
     {
@@ -53,6 +54,16 @@ public sealed partial class MainPage : Page
 
         NavView.MenuItems.Add(_appsItem);
         NavView.MenuItems.Add(_compareItem);
+
+        _settingsItem = new NavigationViewItem
+        {
+            Content = "Settings",
+            Tag = "settings",
+            SelectsOnInvoked = false,
+            Icon = new FontIcon { Glyph = "\uE713" } // Gear
+        };
+        AutomationProperties.SetAutomationId(_settingsItem, "NavSettings");
+        NavView.FooterMenuItems.Add(_settingsItem);
     }
 
     private void InstalledPackages_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
@@ -91,7 +102,14 @@ public sealed partial class MainPage : Page
 
             case "compare":
                 CloseAppsPane();
+                ExitSettingsMode();
                 EnterCompareMode();
+                break;
+
+            case "settings":
+                CloseAppsPane();
+                ExitCompareMode();
+                EnterSettingsMode();
                 break;
         }
     }
@@ -100,6 +118,7 @@ public sealed partial class MainPage : Page
     {
         CloseAppsPane();
         ExitCompareMode();
+        ExitSettingsMode();
         await ViewModel.OpenPackageCommand.ExecuteAsync(null);
     }
 
@@ -134,6 +153,7 @@ public sealed partial class MainPage : Page
         if (e.ClickedItem is InstalledPackage pkg)
         {
             ExitCompareMode();
+            ExitSettingsMode();
             ViewModel.OpenInstalledPackage(pkg);
             // Close the Apps pane so the Sections pane (which now hosts the loaded
             // package's nav + actions) takes over column 0.
@@ -153,6 +173,20 @@ public sealed partial class MainPage : Page
         if (!ViewModel.IsCompareMode) return;
         ViewModel.IsCompareMode = false;
         CompareFrame.Content = null;
+    }
+
+    private void EnterSettingsMode()
+    {
+        ViewModel.IsSettingsMode = true;
+        if (SettingsFrame.Content is null)
+            SettingsFrame.Navigate(typeof(Pages.SettingsPage));
+    }
+
+    internal void ExitSettingsMode()
+    {
+        if (!ViewModel.IsSettingsMode) return;
+        ViewModel.IsSettingsMode = false;
+        SettingsFrame.Content = null;
     }
 
     private void ViewFinding_Click(object sender, RoutedEventArgs e)
