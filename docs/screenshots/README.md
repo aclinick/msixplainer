@@ -4,8 +4,10 @@ Drop PNGs here. Current screenshots referenced by the root README:
 
 | File | Shows |
 |---|---|
-| `ui.png` | WinUI 3 desktop app |
-| `cli.png` | CLI terminal output |
+| `ui.png` | WinUI 3 app — manifest review |
+| `cli.png` | CLI — `msixplainer --sample` output |
+| `compare.png` | WinUI 3 app — Compare page (update diff between two packages) |
+| `comparecli.png` | CLI — `msixplainer diff` output |
 
 ## Capture tips
 

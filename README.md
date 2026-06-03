@@ -13,7 +13,10 @@ Instead of reading raw XML, you get categorized findings with severity ratings, 
 
 | WinUI app | CLI |
 |---|---|
-| ![WinUI app](docs/screenshots/ui.png) | ![CLI output](docs/screenshots/cli.png) |
+| ![Manifest review](docs/screenshots/ui.png) | ![CLI output](docs/screenshots/cli.png) |
+| ![Update compare](docs/screenshots/compare.png) | ![CLI diff](docs/screenshots/comparecli.png) |
+
+*Top row: manifest review. Bottom row: update diff between two package versions.*
 
 ---
 
