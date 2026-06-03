@@ -42,6 +42,21 @@ public partial class App : Application
     public App()
     {
         InitializeComponent();
+        UnhandledException += OnUnhandledException;
+    }
+
+    /// <summary>
+    /// Global safety net for UI-thread exceptions. Prevents process termination
+    /// when an unexpected exception bubbles up — for example, WinUI 3's built-in
+    /// TextBlock context-menu Copy command has been observed to throw
+    /// <see cref="System.Runtime.InteropServices.COMException"/> on some
+    /// Windows builds when the clipboard is contended. Catching it here keeps
+    /// the analysis session alive; the failed action is simply a no-op.
+    /// </summary>
+    private void OnUnhandledException(object sender, Microsoft.UI.Xaml.UnhandledExceptionEventArgs e)
+    {
+        System.Diagnostics.Debug.WriteLine($"[MSIXplainer] Unhandled UI exception swallowed: {e.Exception}");
+        e.Handled = true;
     }
 
     /// <summary>

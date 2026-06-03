@@ -323,6 +323,7 @@
                                                                 <ColumnDefinition Width="160" />
                                                                 <ColumnDefinition Width="*" />
                                                                 <ColumnDefinition Width="Auto" />
+                                                                <ColumnDefinition Width="Auto" />
                                                             </Grid.ColumnDefinitions>
                                                             <TextBlock Grid.Column="0" Text="{x:Bind Label}"
                                                                        Style="{StaticResource BodyStrongTextBlockStyle}"
@@ -336,8 +337,21 @@
                                                                            TextWrapping="Wrap"
                                                                            Style="{StaticResource CaptionTextBlockStyle}" />
                                                             </StackPanel>
-                                                            <!-- Finding badge (clickable) -->
+                                                            <!-- Copy value to clipboard -->
                                                             <Button Grid.Column="2"
+                                                                    AutomationProperties.AutomationId="BtnCopyProperty"
+                                                                    AutomationProperties.Name="Copy value to clipboard"
+                                                                    ToolTipService.ToolTip="Copy value to clipboard"
+                                                                    VerticalAlignment="Top"
+                                                                    Padding="6" MinWidth="0" MinHeight="0"
+                                                                    Background="Transparent" BorderThickness="0"
+                                                                    Tag="{x:Bind Value}"
+                                                                    Click="CopyPropertyValue_Click">
+                                                                <FontIcon Glyph="&#xE8C8;" FontSize="14"
+                                                                          Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                            </Button>
+                                                            <!-- Finding badge (clickable) -->
+                                                            <Button Grid.Column="3"
                                                                     AutomationProperties.AutomationId="BtnViewFinding"
                                                                     VerticalAlignment="Top"
                                                                     Padding="0" MinWidth="0" MinHeight="0"

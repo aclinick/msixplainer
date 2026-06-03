@@ -85,6 +85,31 @@ public sealed partial class MainPage : Page
             ViewModel.SelectedFinding = finding;
     }
 
+    /// <summary>
+    /// Copies a manifest property value to the clipboard. Wraps the clipboard
+    /// call in try/catch so a transient clipboard failure (e.g. another
+    /// process holding it open) never bubbles up as an unhandled exception.
+    /// Bug fix for #10 — the built-in TextBlock context-menu Copy was
+    /// crashing the app on some Windows builds; this gives users a reliable
+    /// alternative.
+    /// </summary>
+    private void CopyPropertyValue_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement fe || fe.Tag is not string value || string.IsNullOrEmpty(value))
+            return;
+
+        try
+        {
+            var package = new Windows.ApplicationModel.DataTransfer.DataPackage();
+            package.SetText(value);
+            Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(package);
+        }
+        catch (System.Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[MSIXplainer] Clipboard copy failed: {ex.Message}");
+        }
+    }
+
     private void OnCompareVersionsClick(object sender, RoutedEventArgs e)
     {
         Frame.Navigate(typeof(Pages.ComparePage));
