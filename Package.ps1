@@ -233,8 +233,7 @@ foreach ($platform in $platforms) {
         "MSIXplainer.Cli.exe",
         "MSIXplainer.Cli.dll",
         "MSIXplainer.Cli.deps.json",
-        "MSIXplainer.Cli.runtimeconfig.json",
-        "Spectre.Console.dll"
+        "MSIXplainer.Cli.runtimeconfig.json"
     )
     foreach ($f in $cliFiles) {
         $src = Join-Path $cliPublishDir $f
@@ -243,6 +242,17 @@ foreach ($platform in $platforms) {
             exit 1
         }
         Copy-Item $src -Destination $outputDir -Force
+    }
+    # Copy every Spectre.Console.*.dll the publish step produced. Spectre split into
+    # multiple assemblies (Spectre.Console, Spectre.Console.Ansi, …) so a fixed list
+    # silently drops dependencies whenever the package surface changes.
+    $spectreDlls = Get-ChildItem -Path $cliPublishDir -Filter "Spectre.Console*.dll" -File -ErrorAction SilentlyContinue
+    if (-not $spectreDlls -or $spectreDlls.Count -eq 0) {
+        Write-Host "ERROR: No Spectre.Console*.dll files found in $cliPublishDir" -ForegroundColor Red
+        exit 1
+    }
+    foreach ($dll in $spectreDlls) {
+        Copy-Item $dll.FullName -Destination $outputDir -Force
     }
     Write-Host "Copied CLI binaries into $outputDir" -ForegroundColor DarkGray
 

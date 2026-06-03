@@ -11,7 +11,7 @@
   <Identity
     Name="Clinick.msixplainer"
     Publisher="CN=46604BD4-AFD9-4B23-8EB3-10EAF66872A5"
-    Version="1.0.17.0" />
+    Version="1.0.19.0" />
 
   <mp:PhoneIdentity PhoneProductId="3a09e9f9-55b1-418a-9e63-9a662f1a29bc" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
 
