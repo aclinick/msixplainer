@@ -10,87 +10,77 @@
     xmlns:models="using:MSIXplainer.Models"
     mc:Ignorable="d">
 
-    <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-        </Grid.RowDefinitions>
+    <!-- ═══ Body: Bandwidth Planner sidebar (left) + scrollable content (right) ═══ -->
+    <Grid ColumnSpacing="0">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
 
-        <!-- ═══ Toolbar ═══ -->
-        <Grid Grid.Row="0" Padding="16,12" ColumnSpacing="8"
-              BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
-              BorderThickness="0,0,0,1">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="*" />
-            </Grid.ColumnDefinitions>
-
-            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8">
-                <Button AutomationProperties.AutomationId="BtnBackToAnalyse"
-                        Click="OnBackClick"
-                        Style="{StaticResource SubtleButtonStyle}">
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <FontIcon Glyph="&#xE72B;" FontSize="16" />
-                        <TextBlock Text="Back to Analyse" />
-                    </StackPanel>
-                </Button>
-            </StackPanel>
-
-            <TextBlock Grid.Column="1"
-                       Text="Compare Versions"
-                       VerticalAlignment="Center"
-                       HorizontalAlignment="Center"
-                       Style="{StaticResource SubtitleTextBlockStyle}" />
-        </Grid>
-
-        <!-- ═══ Body: Actions sidebar (left) + scrollable content (right) ═══ -->
-        <Grid Grid.Row="1" ColumnSpacing="0">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="*" />
-            </Grid.ColumnDefinitions>
-
-            <!-- ── Actions sidebar: visible once a comparison has results. Mirrors the
-                 Sections-pane pattern from MainPage so heavyweight per-context actions
-                 (Export Markdown / JSON) live in a dedicated column instead of being
-                 tucked inline with the data. ── -->
-            <Border Grid.Column="0" Width="240"
-                    Visibility="{x:Bind local:ComparePage.BoolToVisibility(ViewModel.HasResult), Mode=OneWay}"
+            <!-- ── Bandwidth Planner sidebar: always visible (mirrors the Sections-pane
+                 pattern from MainPage). Title + intro at top; Export action buttons
+                 appear at the bottom once a comparison has results. ── -->
+            <Border Grid.Column="0" Width="280"
                     Background="{ThemeResource LayerFillColorDefaultBrush}"
                     BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
                     BorderThickness="0,0,1,0">
-                <StackPanel Spacing="4" Padding="12,16,12,12">
-                    <TextBlock Text="Actions"
-                               Style="{StaticResource BodyStrongTextBlockStyle}"
-                               Padding="4,0,0,8" />
-                    <Button AutomationProperties.AutomationId="BtnExportMarkdown"
-                            Command="{x:Bind ViewModel.ExportMarkdownCommand}"
-                            HorizontalAlignment="Stretch"
-                            HorizontalContentAlignment="Left"
-                            Style="{StaticResource SubtleButtonStyle}">
-                        <StackPanel Orientation="Horizontal" Spacing="12">
-                            <FontIcon Glyph="&#xE8A5;" FontSize="16" />
-                            <TextBlock Text="Export to Markdown" />
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <!-- Title / intro -->
+                    <StackPanel Grid.Row="0" Spacing="8" Padding="16,16,16,12">
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <FontIcon Glyph="&#xE8AB;" FontSize="20"
+                                      VerticalAlignment="Center" />
+                            <TextBlock Text="Bandwidth Planner"
+                                       Style="{StaticResource SubtitleTextBlockStyle}"
+                                       VerticalAlignment="Center" />
                         </StackPanel>
-                    </Button>
-                    <Button AutomationProperties.AutomationId="BtnExportJson"
-                            Command="{x:Bind ViewModel.ExportJsonCommand}"
-                            HorizontalAlignment="Stretch"
-                            HorizontalContentAlignment="Left"
-                            Style="{StaticResource SubtleButtonStyle}">
-                        <StackPanel Orientation="Horizontal" Spacing="12">
-                            <FontIcon Glyph="&#xE74E;" FontSize="16" />
-                            <TextBlock Text="Export to JSON" />
-                        </StackPanel>
-                    </Button>
-                </StackPanel>
+                        <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                   Style="{StaticResource CaptionTextBlockStyle}"
+                                   TextWrapping="Wrap"
+                                   Text="Estimate the on-wire download size of an MSIX update by comparing AppxBlockMap of two versions." />
+                    </StackPanel>
+
+                    <!-- (Future: section nav for jumping within the report.) -->
+                    <Border Grid.Row="1" />
+
+                    <!-- Footer: Export action buttons (visible after a comparison runs) -->
+                    <StackPanel Grid.Row="2" Spacing="4" Padding="12,8,12,12"
+                                BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                                BorderThickness="0,1,0,0"
+                                Visibility="{x:Bind local:ComparePage.BoolToVisibility(ViewModel.HasResult), Mode=OneWay}">
+                        <Button AutomationProperties.AutomationId="BtnExportMarkdown"
+                                Command="{x:Bind ViewModel.ExportMarkdownCommand}"
+                                HorizontalAlignment="Stretch"
+                                HorizontalContentAlignment="Left"
+                                Style="{StaticResource SubtleButtonStyle}">
+                            <StackPanel Orientation="Horizontal" Spacing="12">
+                                <FontIcon Glyph="&#xE8A5;" FontSize="16" />
+                                <TextBlock Text="Export to Markdown" />
+                            </StackPanel>
+                        </Button>
+                        <Button AutomationProperties.AutomationId="BtnExportJson"
+                                Command="{x:Bind ViewModel.ExportJsonCommand}"
+                                HorizontalAlignment="Stretch"
+                                HorizontalContentAlignment="Left"
+                                Style="{StaticResource SubtleButtonStyle}">
+                            <StackPanel Orientation="Horizontal" Spacing="12">
+                                <FontIcon Glyph="&#xE74E;" FontSize="16" />
+                                <TextBlock Text="Export to JSON" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </Grid>
             </Border>
 
             <ScrollViewer Grid.Column="1" Padding="24" VerticalScrollBarVisibility="Auto">
             <StackPanel Spacing="20" MaxWidth="1100" HorizontalAlignment="Stretch">
 
-                <TextBlock Text="Estimate the on-wire download size of an MSIX update"
-                           Style="{StaticResource TitleTextBlockStyle}" />
                 <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                            TextWrapping="Wrap"
                            Text="Pick the currently installed package version and a newer version. MSIXplainer reads the AppxBlockMap of each and reports exactly which blocks must travel over the wire — the same block-reuse mechanism the platform uses for updates." />
@@ -614,6 +604,5 @@
                 </StackPanel>
             </StackPanel>
             </ScrollViewer>
-        </Grid>
     </Grid>
 </Page>

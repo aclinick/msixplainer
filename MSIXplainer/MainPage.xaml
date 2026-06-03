@@ -36,6 +36,7 @@
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
 
@@ -62,8 +63,22 @@
                         </Button>
                     </Grid>
 
+                    <!-- Open from disk: primary action for picking a package that isn't installed -->
+                    <Button Grid.Row="1"
+                            AutomationProperties.AutomationId="BtnOpenPackageFromDisk"
+                            Click="OnOpenPackageFromDiskClick"
+                            HorizontalAlignment="Stretch"
+                            HorizontalContentAlignment="Left"
+                            Margin="12,0,12,8"
+                            Style="{StaticResource SubtleButtonStyle}">
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <FontIcon Glyph="&#xE8E5;" FontSize="16" />
+                            <TextBlock Text="Open .msix from disk…" />
+                        </StackPanel>
+                    </Button>
+
                     <!-- Loading state -->
-                    <StackPanel Grid.Row="1"
+                    <StackPanel Grid.Row="2"
                                 Visibility="{x:Bind local:MainPage.BoolToVisibility(ViewModel.IsLoadingInstalledApps), Mode=OneWay}"
                                 HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">
                         <ProgressRing IsActive="True" Width="32" Height="32" />
@@ -72,7 +87,7 @@
                     </StackPanel>
 
                     <!-- Apps list -->
-                    <ListView Grid.Row="1"
+                    <ListView Grid.Row="2"
                               AutomationProperties.AutomationId="LstInstalledApps"
                               ItemsSource="{x:Bind ViewModel.InstalledPackages}"
                               SelectionMode="Single"
@@ -229,7 +244,7 @@
                 <TextBlock Text="MSIXplainer"
                            HorizontalAlignment="Center"
                            Style="{StaticResource TitleTextBlockStyle}" />
-                <TextBlock Text="Pick an installed app from the side menu, open an .msix file, or compare two versions."
+                <TextBlock Text="Open the Apps pane to pick an installed app or open an .msix from disk — or jump to Compare Versions to plan an update."
                            HorizontalAlignment="Center"
                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                            TextAlignment="Center"

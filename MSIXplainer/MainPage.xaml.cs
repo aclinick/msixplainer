@@ -16,11 +16,11 @@ public sealed partial class MainPage : Page
 {
     public MainPageViewModel ViewModel { get; } = new();
 
-    // The top-level NavView only shows three static entry points (Apps, Open,
-    // Compare). Per-package navigation lives in the dedicated Sections
-    // secondary pane, so there are no dynamic items to track here.
+    // The top-level NavView only shows two static entry points (Apps, Compare).
+    // "Open package from disk…" lives inside the Apps pane as a primary action
+    // alongside the installed-apps list, since both are ways of picking a
+    // package to analyze.
     private NavigationViewItem? _appsItem;
-    private NavigationViewItem? _openPackageItem;
     private NavigationViewItem? _compareItem;
 
     public MainPage()
@@ -42,15 +42,6 @@ public sealed partial class MainPage : Page
         };
         AutomationProperties.SetAutomationId(_appsItem, "NavApps");
 
-        _openPackageItem = new NavigationViewItem
-        {
-            Content = "Open Package…",
-            Tag = "open-package",
-            SelectsOnInvoked = false,
-            Icon = new FontIcon { Glyph = "\uE8E5" } // OpenFile
-        };
-        AutomationProperties.SetAutomationId(_openPackageItem, "NavOpenPackage");
-
         _compareItem = new NavigationViewItem
         {
             Content = "Compare Versions…",
@@ -61,7 +52,6 @@ public sealed partial class MainPage : Page
         AutomationProperties.SetAutomationId(_compareItem, "NavCompareVersions");
 
         NavView.MenuItems.Add(_appsItem);
-        NavView.MenuItems.Add(_openPackageItem);
         NavView.MenuItems.Add(_compareItem);
     }
 
@@ -99,17 +89,18 @@ public sealed partial class MainPage : Page
                 await OpenAppsPaneAsync();
                 break;
 
-            case "open-package":
-                CloseAppsPane();
-                ExitCompareMode();
-                await ViewModel.OpenPackageCommand.ExecuteAsync(null);
-                break;
-
             case "compare":
                 CloseAppsPane();
                 EnterCompareMode();
                 break;
         }
+    }
+
+    private async void OnOpenPackageFromDiskClick(object sender, RoutedEventArgs e)
+    {
+        CloseAppsPane();
+        ExitCompareMode();
+        await ViewModel.OpenPackageCommand.ExecuteAsync(null);
     }
 
     private void NavView_SelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
@@ -144,6 +135,9 @@ public sealed partial class MainPage : Page
         {
             ExitCompareMode();
             ViewModel.OpenInstalledPackage(pkg);
+            // Close the Apps pane so the Sections pane (which now hosts the loaded
+            // package's nav + actions) takes over column 0.
+            CloseAppsPane();
         }
     }
 
