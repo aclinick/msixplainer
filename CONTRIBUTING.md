@@ -11,8 +11,8 @@ Thanks for your interest in contributing! This guide will help you get started.
 ## Getting Started
 
 ```bash
-git clone https://github.com/aclinick/msixexplainer.git
-cd msixexplainer
+git clone https://github.com/aclinick/msixplainer.git
+cd msixplainer
 ```
 
 ### Build
@@ -83,4 +83,4 @@ Add a corresponding test in `MSIXplainer.Core.Tests/RulesEngineTests.cs`.
 
 ## Reporting Issues
 
-Please use the [issue templates](https://github.com/aclinick/msixexplainer/issues/new/choose) for bug reports and feature requests.
+Please use the [issue templates](https://github.com/aclinick/msixplainer/issues/new/choose) for bug reports and feature requests.

@@ -4,14 +4,15 @@ A Windows tool that turns MSIX/AppX package manifests into plain-English IT secu
 
 Instead of reading raw XML, you get categorized findings with severity ratings, explanations of what each manifest entry does, why the app might need it, and what an IT Pro should care about.
 
-![License](https://img.shields.io/github/license/aclinick/msixexplainer)
+![License](https://img.shields.io/github/license/aclinick/msixplainer)
+[![CI](https://github.com/aclinick/msixplainer/actions/workflows/ci.yml/badge.svg)](https://github.com/aclinick/msixplainer/actions/workflows/ci.yml)
 
 ---
 
 ## What It Does
 
 - **Opens `.msix` or `.appx` files** and extracts the manifest safely (package is treated as untrusted input — no code is executed)
-- **Analyzes 18 security-relevant categories**: trust level, restricted capabilities, device access, network access, virtualization bypasses, startup tasks, protocol handlers, COM registrations, Office integration, WebView2 dependencies, VDI indicators, and more
+- **Analyzes 18 security-relevant categories**: trust level, restricted capabilities, standard capabilities, device access, network access, virtualization bypasses, startup tasks, protocol handlers, app URI handlers, file associations, COM registrations, background tasks, Office integration, WebView2, VDI indicators, Windows services, allowElevation bypass, and identity validation
 - **Explains every manifest section** in plain English with severity tags (`🔴 CRITICAL`, `🟡 WARNING`, `🔵 REVIEW`, `ℹ️ INFO`)
 - **Exports** annotated Markdown reports (section-by-section walkthrough with XML snippets and explanation tables) and structured JSON
 - **Uses a local deterministic rules engine** — no cloud service, no LLM dependency
@@ -72,8 +73,8 @@ $ msixplainer contoso-hub.msix --markdown --output review.md
 
 ```powershell
 # Clone
-git clone https://github.com/aclinick/msixexplainer.git
-cd msixexplainer
+git clone https://github.com/aclinick/msixplainer.git
+cd msixplainer
 
 # Build everything
 dotnet build
@@ -171,21 +172,28 @@ Or open the solution in Visual Studio and run the `MSIXplainer` project.
 ## Project Structure
 
 ```
-msixexplainer/
-├── MSIXplainer.Core/            # Shared class library
-│   ├── Models/                  # ManifestFinding, PackageInfo, PropertyGroup, Section
+msixplainer/
+├── MSIXplainer.Core/                # Shared class library (no UI deps)
+│   ├── Models/                      # ManifestFinding, PackageInfo, BlockMapEntry,
+│   │                                  BundleInnerPackage, UpdateDiffResult, etc.
 │   └── Services/
-│       ├── ManifestParserService.cs    # Safe ZIP/XML extraction
-│       ├── RulesEngine.cs              # 18-rule analysis engine
-│       ├── ManifestExplainerService.cs # Section-by-section explainer
-│       ├── ExportService.cs            # Markdown + JSON export
-│       └── SampleManifest.cs           # Built-in test manifest
-├── MSIXplainer/                 # WinUI 3 desktop app
-│   ├── MainPage.xaml            # NavigationView + property viewer
-│   ├── ViewModels/              # MVVM with CommunityToolkit.Mvvm
+│       ├── ManifestParserService.cs       # Safe ZIP/XML extraction
+│       ├── BundleManifestParser.cs        # .msixbundle / .appxbundle support
+│       ├── BlockMapParser.cs              # AppxBlockMap.xml parser
+│       ├── RulesEngine.cs                 # 18-rule analysis engine
+│       ├── RuleCatalog.cs / RuleSeverityOverrides.cs  # Severity tuning
+│       ├── ManifestExplainerService.cs    # Section-by-section explainer
+│       ├── ExportService.cs               # Manifest review export (MD + JSON)
+│       ├── UpdateDiffService.cs           # SDK-parity update size analysis
+│       ├── DiffExportService.cs           # Update diff export (MD + JSON)
+│       ├── BandwidthPlannerService.cs     # Fleet rollout estimator
+│       └── SampleManifest.cs              # Built-in test manifest
+├── MSIXplainer/                     # WinUI 3 desktop app (packaged MSIX)
+│   ├── Pages/                       # MainPage, ComparePage, RulesPage
+│   ├── ViewModels/                  # MVVM with CommunityToolkit.Mvvm
 │   └── Package.appxmanifest
-└── MSIXplainer.Cli/             # Spectre.Console CLI
-    └── Program.cs               # Animated output, tables, trees
+└── MSIXplainer.Cli/                 # Spectre.Console CLI
+    └── Program.cs                   # analyze + diff subcommands
 ```
 
 ## Analysis Categories
@@ -194,7 +202,8 @@ msixexplainer/
 |----------|---------------|
 | Identity | Package name, publisher certificate, version |
 | Trust Level | Full trust vs. AppContainer sandboxing |
-| Capabilities | Restricted capabilities (broadFileSystemAccess, appDiagnostics, etc.) |
+| Restricted Capabilities | `broadFileSystemAccess`, `appDiagnostics`, `runFullTrust`, etc. |
+| Standard Capabilities | Internet, removable storage, documents library, etc. |
 | Device Access | Microphone, webcam, location, Bluetooth |
 | Network Access | Internet, private network, server capabilities |
 | Virtualization | Filesystem and registry virtualization bypasses |
@@ -208,6 +217,7 @@ msixexplainer/
 | WebView2 | Embedded browser dependencies |
 | VDI | Virtual desktop infrastructure indicators |
 | Services | Windows service registrations |
+| Elevation | `allowElevation` package extension bypasses |
 
 ## Security Model
 

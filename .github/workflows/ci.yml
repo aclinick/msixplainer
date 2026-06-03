@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Build & Test (Core + CLI)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 10 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+          include-prerelease: true
+
+      - name: Restore
+        run: dotnet restore MSIXplainer.Core/MSIXplainer.Core.csproj MSIXplainer.Cli/MSIXplainer.Cli.csproj MSIXplainer.Core.Tests/MSIXplainer.Core.Tests.csproj
+
+      - name: Build Core
+        run: dotnet build MSIXplainer.Core/MSIXplainer.Core.csproj --no-restore -c Release
+
+      - name: Build CLI
+        run: dotnet build MSIXplainer.Cli/MSIXplainer.Cli.csproj --no-restore -c Release
+
+      - name: Test
+        run: dotnet test MSIXplainer.Core.Tests/MSIXplainer.Core.Tests.csproj --no-restore -c Release --logger "console;verbosity=normal"
