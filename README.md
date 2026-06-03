@@ -4,7 +4,7 @@ A Windows tool that turns MSIX/AppX package manifests into plain-English IT secu
 
 Instead of reading raw XML, you get categorized findings with severity ratings, explanations of what each manifest entry does, why the app might need it, and what an IT Pro should care about.
 
-![License](https://img.shields.io/github/license/aclinick/msixplainer)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![CI](https://github.com/aclinick/msixplainer/actions/workflows/ci.yml/badge.svg)](https://github.com/aclinick/msixplainer/actions/workflows/ci.yml)
 
 ---
