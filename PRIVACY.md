@@ -7,7 +7,7 @@ title: MSIXplainer Privacy Policy
 
 **Last updated:** June 2, 2026
 **App:** MSIXplainer
-**Publisher:** Paymynanny.com
+**Publisher:** Clinick
 
 ## Summary
 
