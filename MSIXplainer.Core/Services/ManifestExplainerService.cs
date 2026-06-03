@@ -158,6 +158,25 @@ public static class ManifestExplainerService
                     Label = "Architecture",
                     Value = identity.Attribute("ProcessorArchitecture")?.Value ?? "neutral",
                     Explanation = "Target processor architecture (x86, x64, arm64, or neutral). Ensure this matches your deployment targets."
+                },
+                new ManifestProperty
+                {
+                    Label = "Package Family Name",
+                    Value = PackageIdentityCalculator.ComputePackageFamilyName(
+                        identity.Attribute("Name")?.Value ?? "",
+                        identity.Attribute("Publisher")?.Value ?? ""),
+                    Explanation = "Format: Name_PublisherHash. Stable across versions and architectures — use this in AppLocker rules, Intune detection scripts, WDAC policies, and PowerShell Get-AppxPackage queries."
+                },
+                new ManifestProperty
+                {
+                    Label = "Package Full Name",
+                    Value = PackageIdentityCalculator.ComputePackageFullName(
+                        identity.Attribute("Name")?.Value ?? "",
+                        identity.Attribute("Version")?.Value ?? "",
+                        identity.Attribute("ProcessorArchitecture")?.Value ?? "neutral",
+                        identity.Attribute("ResourceId")?.Value ?? "",
+                        identity.Attribute("Publisher")?.Value ?? ""),
+                    Explanation = "Format: Name_Version_Architecture_ResourceId_PublisherHash. Identifies this exact build — use with Add-AppxPackage / Remove-AppxPackage and the Win32_InstalledStoreProgram WMI class."
                 }
             ]
         });

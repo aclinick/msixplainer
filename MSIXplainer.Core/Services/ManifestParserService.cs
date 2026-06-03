@@ -157,18 +157,27 @@ public static class ManifestParserService
             .Select(e => $"{e.Attribute("Name")?.Value} {e.Attribute("MinVersion")?.Value}")
             .ToList() ?? [];
 
+        var name = identity?.Attribute("Name")?.Value ?? "Unknown";
+        var publisher = identity?.Attribute("Publisher")?.Value ?? "Unknown";
+        var version = identity?.Attribute("Version")?.Value ?? "0.0.0.0";
+        var architecture = identity?.Attribute("ProcessorArchitecture")?.Value ?? "neutral";
+        var resourceId = identity?.Attribute("ResourceId")?.Value ?? "";
+
         return new PackageInfo
         {
-            Name = identity?.Attribute("Name")?.Value ?? "Unknown",
-            Publisher = identity?.Attribute("Publisher")?.Value ?? "Unknown",
-            Version = identity?.Attribute("Version")?.Value ?? "0.0.0.0",
-            Architecture = identity?.Attribute("ProcessorArchitecture")?.Value ?? "neutral",
+            Name = name,
+            Publisher = publisher,
+            Version = version,
+            Architecture = architecture,
+            ResourceId = resourceId,
             DisplayName = properties?.Element(Ns + "DisplayName")?.Value ?? "Unknown",
             PublisherDisplayName = properties?.Element(Ns + "PublisherDisplayName")?.Value ?? "",
             Description = properties?.Element(Ns + "Description")?.Value ?? "",
             MinOsVersion = targetFamily?.Attribute("MinVersion")?.Value ?? "",
             MaxOsVersionTested = targetFamily?.Attribute("MaxVersionTested")?.Value ?? "",
-            FrameworkDependencies = frameworks.Count > 0 ? string.Join(", ", frameworks) : "None"
+            FrameworkDependencies = frameworks.Count > 0 ? string.Join(", ", frameworks) : "None",
+            PackageFamilyName = PackageIdentityCalculator.ComputePackageFamilyName(name, publisher),
+            PackageFullName = PackageIdentityCalculator.ComputePackageFullName(name, version, architecture, resourceId, publisher)
         };
     }
 
