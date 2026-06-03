@@ -43,7 +43,50 @@
                        Style="{StaticResource SubtitleTextBlockStyle}" />
         </Grid>
 
-        <ScrollViewer Grid.Row="1" Padding="24" VerticalScrollBarVisibility="Auto">
+        <!-- ═══ Body: Actions sidebar (left) + scrollable content (right) ═══ -->
+        <Grid Grid.Row="1" ColumnSpacing="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <!-- ── Actions sidebar: visible once a comparison has results. Mirrors the
+                 Sections-pane pattern from MainPage so heavyweight per-context actions
+                 (Export Markdown / JSON) live in a dedicated column instead of being
+                 tucked inline with the data. ── -->
+            <Border Grid.Column="0" Width="240"
+                    Visibility="{x:Bind local:ComparePage.BoolToVisibility(ViewModel.HasResult), Mode=OneWay}"
+                    Background="{ThemeResource LayerFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                    BorderThickness="0,0,1,0">
+                <StackPanel Spacing="4" Padding="12,16,12,12">
+                    <TextBlock Text="Actions"
+                               Style="{StaticResource BodyStrongTextBlockStyle}"
+                               Padding="4,0,0,8" />
+                    <Button AutomationProperties.AutomationId="BtnExportMarkdown"
+                            Command="{x:Bind ViewModel.ExportMarkdownCommand}"
+                            HorizontalAlignment="Stretch"
+                            HorizontalContentAlignment="Left"
+                            Style="{StaticResource SubtleButtonStyle}">
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <FontIcon Glyph="&#xE8A5;" FontSize="16" />
+                            <TextBlock Text="Export to Markdown" />
+                        </StackPanel>
+                    </Button>
+                    <Button AutomationProperties.AutomationId="BtnExportJson"
+                            Command="{x:Bind ViewModel.ExportJsonCommand}"
+                            HorizontalAlignment="Stretch"
+                            HorizontalContentAlignment="Left"
+                            Style="{StaticResource SubtleButtonStyle}">
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <FontIcon Glyph="&#xE74E;" FontSize="16" />
+                            <TextBlock Text="Export to JSON" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </Border>
+
+            <ScrollViewer Grid.Column="1" Padding="24" VerticalScrollBarVisibility="Auto">
             <StackPanel Spacing="20" MaxWidth="1100" HorizontalAlignment="Stretch">
 
                 <TextBlock Text="Estimate the on-wire download size of an MSIX update"
@@ -451,33 +494,8 @@
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
 
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="Top contributors to the update download"
-                                   Style="{StaticResource SubtitleTextBlockStyle}"
-                                   VerticalAlignment="Center" />
-                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
-                            <Button AutomationProperties.AutomationId="BtnExportMarkdown"
-                                    Command="{x:Bind ViewModel.ExportMarkdownCommand}"
-                                    Style="{StaticResource SubtleButtonStyle}">
-                                <StackPanel Orientation="Horizontal" Spacing="6">
-                                    <FontIcon Glyph="&#xE8A5;" FontSize="14" />
-                                    <TextBlock Text="Export Markdown" />
-                                </StackPanel>
-                            </Button>
-                            <Button AutomationProperties.AutomationId="BtnExportJson"
-                                    Command="{x:Bind ViewModel.ExportJsonCommand}"
-                                    Style="{StaticResource SubtleButtonStyle}">
-                                <StackPanel Orientation="Horizontal" Spacing="6">
-                                    <FontIcon Glyph="&#xE943;" FontSize="14" />
-                                    <TextBlock Text="Export JSON" />
-                                </StackPanel>
-                            </Button>
-                        </StackPanel>
-                    </Grid>
+                    <TextBlock Text="Top contributors to the update download"
+                               Style="{StaticResource SubtitleTextBlockStyle}" />
                     <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                Text="Up to 50 files sorted by on-wire delta. These are the files driving the update size." />
                     <ListView ItemsSource="{x:Bind ViewModel.TopFileChanges}"
@@ -595,6 +613,7 @@
 
                 </StackPanel>
             </StackPanel>
-        </ScrollViewer>
+            </ScrollViewer>
+        </Grid>
     </Grid>
 </Page>

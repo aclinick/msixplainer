@@ -30,23 +30,23 @@ public static class ManifestExplainerService
             {
                 Tag = "overview",
                 Label = "Overview",
-                IconGlyph = "\uE80F",
+                IconGlyph = "\uE946", // Info ⓘ — Overview = summary/info, not "home"
                 FindingCount = findings.Count,
                 WorstSeverity = findings.Count > 0 ? findings.Max(f => f.Severity) : FindingSeverity.Info
             }
         };
 
         if (root.Element(Ns + "Identity") is not null)
-            sections.Add(MakeSection("identity", "Identity", "\uE77B", findings, FindingCategory.Identity));
+            sections.Add(MakeSection("identity", "Identity", "\uE77B", findings, FindingCategory.Identity)); // Contact
 
         if (root.Elements(Ns + "Properties").Any())
-            sections.Add(MakeSection("properties", "Properties", "\uE8A1", findings, FindingCategory.Virtualization));
+            sections.Add(MakeSection("properties", "Properties", "\uE713", findings, FindingCategory.Virtualization)); // Settings (gear)
 
         if (root.Element(Ns + "Dependencies") is not null)
-            sections.Add(new ManifestSection { Tag = "dependencies", Label = "Dependencies", IconGlyph = "\uE74C" });
+            sections.Add(new ManifestSection { Tag = "dependencies", Label = "Dependencies", IconGlyph = "\uE71B" }); // Link (dependencies reference other packages)
 
         if (root.Element(Ns + "Resources") is not null)
-            sections.Add(new ManifestSection { Tag = "resources", Label = "Resources", IconGlyph = "\uE774" });
+            sections.Add(new ManifestSection { Tag = "resources", Label = "Resources", IconGlyph = "\uE774" }); // Globe (localized resources)
 
         var apps = root.Element(Ns + "Applications")?.Elements(Ns + "Application").ToList() ?? [];
         if (apps.Count > 0)

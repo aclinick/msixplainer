@@ -14,6 +14,8 @@ public partial class MainPageViewModel : ObservableObject
     [ObservableProperty]
     public partial bool IsPackageLoaded { get; set; }
 
+    partial void OnIsPackageLoadedChanged(bool value) => RecomputeSectionsPaneVisibility();
+
     [ObservableProperty]
     public partial PackageInfo? PackageInfo { get; set; }
 
@@ -77,6 +79,8 @@ public partial class MainPageViewModel : ObservableObject
     [ObservableProperty]
     public partial bool IsCompareMode { get; set; }
 
+    partial void OnIsCompareModeChanged(bool value) => RecomputeSectionsPaneVisibility();
+
     /// <summary>
     /// When true, the Apps secondary pane (Outlook-style second column) is visible
     /// between the nav rail and the main content area. Toggled by the Apps nav item.
@@ -84,8 +88,34 @@ public partial class MainPageViewModel : ObservableObject
     [ObservableProperty]
     public partial bool IsAppsPaneOpen { get; set; }
 
-    /// <summary>Raised when sections are rebuilt so code-behind can refresh NavigationView items.</summary>
-    public event Action? SectionsRebuilt;
+    partial void OnIsAppsPaneOpenChanged(bool value) => RecomputeSectionsPaneVisibility();
+
+    /// <summary>
+    /// When true, the Sections secondary pane is visible in column 0 (mutually
+    /// exclusive with the Apps pane). A package must be loaded and we must not
+    /// be in Compare mode.
+    /// </summary>
+    [ObservableProperty]
+    public partial bool IsSectionsPaneVisible { get; set; }
+
+    /// <summary>
+    /// Two-way bound to the Sections ListView in the secondary pane. Changing this
+    /// dispatches to <see cref="SelectSection"/>; <see cref="SelectSection"/> also
+    /// writes back here so programmatic selection (e.g. "overview" on package load)
+    /// highlights the right row.
+    /// </summary>
+    [ObservableProperty]
+    public partial ManifestSection? SelectedSection { get; set; }
+
+    partial void OnSelectedSectionChanged(ManifestSection? value)
+    {
+        if (value is null) return;
+        if (value.Tag == SelectedSectionTag) return;
+        SelectSection(value.Tag);
+    }
+
+    private void RecomputeSectionsPaneVisibility() =>
+        IsSectionsPaneVisible = IsPackageLoaded && !IsCompareMode && !IsAppsPaneOpen;
 
     private List<ManifestFinding> _allFindings = [];
     private XElement? _manifestRoot;
@@ -369,6 +399,12 @@ public partial class MainPageViewModel : ObservableObject
         IsRawXmlSelected = tag == "raw-xml";
         IsSectionSelected = !IsOverviewSelected && !IsRawXmlSelected;
 
+        // Keep the Sections pane ListView selection in sync. The setter is no-op
+        // when the tag already matches (see OnSelectedSectionChanged guard).
+        var match = Sections.FirstOrDefault(s => s.Tag == tag);
+        if (match is not null && !ReferenceEquals(SelectedSection, match))
+            SelectedSection = match;
+
         CurrentGroups.Clear();
         CategoryFindings.Clear();
         SelectedFinding = null;
@@ -403,7 +439,6 @@ public partial class MainPageViewModel : ObservableObject
 
         BuildSections();
         ComputeAssessment(info);
-        SectionsRebuilt?.Invoke();
     }
 
     private static RuleSeverityOverrides LoadUserRuleOverrides()
