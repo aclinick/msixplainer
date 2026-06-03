@@ -1,6 +1,7 @@
 using System.Runtime.Versioning;
 using MSIXplainer.Models;
 using Windows.ApplicationModel;
+using Windows.ApplicationModel.Core;
 using Windows.Management.Deployment;
 
 namespace MSIXplainer.Services;
@@ -87,7 +88,7 @@ public static class InstalledPackageService
             string.Equals(p.PackageFamilyName, packageFamilyName, StringComparison.OrdinalIgnoreCase));
     }
 
-    [SupportedOSPlatform("windows10.0.10240.0")]
+    [SupportedOSPlatform("windows10.0.19041.0")]
     private static IReadOnlyList<InstalledPackage> ListWindows(bool withIcons)
     {
         var pm = new PackageManager();
@@ -109,11 +110,11 @@ public static class InstalledPackageService
     }
 
     /// <summary>
-    /// Maps a WinRT <see cref="Package"/> to our DTO. Wraps every property access
-    /// because the API can throw <see cref="System.IO.FileNotFoundException"/> or access-denied
-    /// for system / partially-staged packages.
+    /// Maps a WinRT <see cref="Package"/> to our DTO. Returns null for packages that
+    /// don't have any Start-menu entry (background services, framework extensions,
+    /// media codecs, system components) — matching what users mentally consider an "app".
     /// </summary>
-    [SupportedOSPlatform("windows10.0.10240.0")]
+    [SupportedOSPlatform("windows10.0.19041.0")]
     internal static InstalledPackage? TryMap(Package pkg, bool withIcon = true)
     {
         try
@@ -121,14 +122,25 @@ public static class InstalledPackageService
             var id = pkg.Id;
             if (id is null || string.IsNullOrEmpty(id.Name)) return null;
 
-            // Package.DisplayName auto-resolves ms-resource:// indirection via the
-            // package's MRT resource map. Fall back to identity Name when resolution
-            // fails — observed failure modes include returning an empty string, a
-            // leading "ms-resource:..." literal, OR a longer string containing an
-            // unresolved "ms-resource:" fragment embedded mid-text.
-            string displayName;
-            try { displayName = pkg.DisplayName; }
-            catch { displayName = string.Empty; }
+            // Filter to packages that appear in Start (== "apps" as the user knows them).
+            // Skips media extensions, background services, dev/test stubs, etc.
+            IReadOnlyList<AppListEntry>? entries = null;
+            try { entries = pkg.GetAppListEntries(); }
+            catch { /* some packages refuse — treat as "no entry" → skip */ }
+            if (entries is null || entries.Count == 0) return null;
+
+            // Prefer the Start-menu entry's display name (already resolved via MRT,
+            // includes any Application-level overrides). Falls back to Package.DisplayName
+            // and finally to identity Name.
+            string displayName = string.Empty;
+            try { displayName = entries[0].DisplayInfo?.DisplayName ?? string.Empty; }
+            catch { /* fall through */ }
+            if (string.IsNullOrWhiteSpace(displayName)
+                || displayName.Contains("ms-resource:", StringComparison.Ordinal))
+            {
+                try { displayName = pkg.DisplayName; }
+                catch { displayName = string.Empty; }
+            }
             if (string.IsNullOrWhiteSpace(displayName)
                 || displayName.Contains("ms-resource:", StringComparison.Ordinal))
             {

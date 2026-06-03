@@ -15,6 +15,7 @@
                     OpenPaneLength="280"
                     IsBackButtonVisible="Collapsed"
                     IsSettingsVisible="False"
+                    AlwaysShowHeader="False"
                     SelectionChanged="NavView_SelectionChanged"
                     ItemInvoked="NavView_ItemInvoked"
                     Expanding="NavView_Expanding">
@@ -58,17 +59,8 @@
             </NavigationViewItem>
         </NavigationView.FooterMenuItems>
 
-        <!-- Header: current package path -->
-        <NavigationView.Header>
-            <TextBlock Text="{x:Bind ViewModel.PackageFilePath, Mode=OneWay}"
-                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                       TextTrimming="CharacterEllipsis"
-                       Style="{StaticResource CaptionTextBlockStyle}"
-                       Visibility="{x:Bind local:MainPage.StringToVisibility(ViewModel.PackageFilePath), Mode=OneWay}" />
-        </NavigationView.Header>
-
         <!-- ═══ Content area ═══ -->
-        <Grid ColumnSpacing="0">
+        <Grid ColumnSpacing="0" Padding="0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
@@ -141,11 +133,11 @@
                                         <Grid>
                                             <FontIcon Glyph="&#xE7B8;" FontSize="16"
                                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                                      Visibility="{x:Bind local:MainPage.NullBytesToVisibility(IconBytes)}" />
-                                            <Image Source="{x:Bind local:MainPage.BytesToBitmap(IconBytes)}"
+                                                      Visibility="{x:Bind local:MainPage.NullObjectToVisibility(IconImage)}" />
+                                            <Image Source="{x:Bind local:MainPage.ObjectToImageSource(IconImage)}"
                                                    Width="28" Height="28"
                                                    Stretch="Uniform"
-                                                   Visibility="{x:Bind local:MainPage.NonNullBytesToVisibility(IconBytes)}" />
+                                                   Visibility="{x:Bind local:MainPage.NonNullObjectToVisibility(IconImage)}" />
                                         </Grid>
                                     </Border>
 

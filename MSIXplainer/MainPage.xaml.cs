@@ -284,6 +284,15 @@ public sealed partial class MainPage : Page
     public static Visibility NonNullBytesToVisibility(byte[]? value) =>
         value is { Length: > 0 } ? Visibility.Visible : Visibility.Collapsed;
 
+    public static Visibility NullObjectToVisibility(object? value) =>
+        value is null ? Visibility.Visible : Visibility.Collapsed;
+
+    public static Visibility NonNullObjectToVisibility(object? value) =>
+        value is null ? Visibility.Collapsed : Visibility.Visible;
+
+    public static Microsoft.UI.Xaml.Media.ImageSource? ObjectToImageSource(object? value) =>
+        value as Microsoft.UI.Xaml.Media.ImageSource;
+
     public static BitmapImage? BytesToBitmap(byte[]? bytes)
     {
         if (bytes is null || bytes.Length == 0) return null;

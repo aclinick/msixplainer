@@ -49,7 +49,7 @@ public class ManifestExplainerServiceTests
         var (manifest, findings) = LoadSample();
         var sections = ManifestExplainerService.BuildSections(manifest, findings);
 
-        Assert.Contains(sections, s => s.Tag.StartsWith("app:"));
+        Assert.Contains(sections, s => s.Tag == "applications");
     }
 
     [Fact]

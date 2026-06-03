@@ -256,15 +256,17 @@ public partial class MainPageViewModel : ObservableObject
 
     private async Task ResolveIconsAsync(CancellationToken token)
     {
-        // Snapshot indices to avoid reacting to user-driven collection edits.
-        // Walk the collection; for each row, resolve the icon on a background
-        // thread then marshal the replacement back to the UI thread.
+        // Walk the collection. For each row:
+        //   1. Resolve raw icon bytes on background thread (file I/O + manifest parse).
+        //   2. On UI thread, decode bytes → BitmapImage with PROPER async/await
+        //      (no .GetAwaiter().GetResult() — that froze the UI in the prior version).
+        //   3. Replace the row with both IconBytes and a decoded IconImage set.
         for (int i = 0; i < InstalledPackages.Count; i++)
         {
             if (token.IsCancellationRequested) return;
 
             var current = InstalledPackages[i];
-            if (current.IconBytes is { Length: > 0 }) continue;
+            if (current.IconImage is not null) continue;
 
             InstalledPackage resolved;
             try
@@ -277,11 +279,42 @@ public partial class MainPageViewModel : ObservableObject
             if (token.IsCancellationRequested) return;
             if (resolved.IconBytes is not { Length: > 0 }) continue;
 
-            // Re-find by family name in case the collection shifted (defensive;
-            // we don't mutate it during pass 2 today but this keeps the row update safe).
+            // Decode on UI thread (we're already back on it because we awaited Task.Run).
+            // Yield briefly between rows so other UI work — input, scrolling, layout —
+            // gets a turn. Without this, decoding ~200 icons back-to-back can still
+            // feel sluggish even though each decode is microseconds.
+            var bitmap = await DecodeBitmapAsync(resolved.IconBytes);
+            if (bitmap is null) continue;
+            if (token.IsCancellationRequested) return;
+
             var idx = IndexOfByFamilyName(resolved.PackageFamilyName);
             if (idx >= 0)
-                InstalledPackages[idx] = resolved;
+                InstalledPackages[idx] = resolved with { IconImage = bitmap };
+
+            // Cooperative yield so the UI thread can service input between rows.
+            await Task.Yield();
+        }
+    }
+
+    private static async Task<Microsoft.UI.Xaml.Media.Imaging.BitmapImage?> DecodeBitmapAsync(byte[] bytes)
+    {
+        try
+        {
+            var bitmap = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage();
+            using var stream = new Windows.Storage.Streams.InMemoryRandomAccessStream();
+            using (var writer = new Windows.Storage.Streams.DataWriter(stream.GetOutputStreamAt(0)))
+            {
+                writer.WriteBytes(bytes);
+                await writer.StoreAsync();
+                writer.DetachStream();
+            }
+            stream.Seek(0);
+            await bitmap.SetSourceAsync(stream);
+            return bitmap;
+        }
+        catch
+        {
+            return null;
         }
     }
 

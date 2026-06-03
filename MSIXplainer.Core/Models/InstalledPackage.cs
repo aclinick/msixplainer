@@ -33,6 +33,15 @@ public sealed record InstalledPackage
     public byte[]? IconBytes { get; init; }
 
     /// <summary>
+    /// Pre-decoded image source for UI binding (typically a WinUI <c>BitmapImage</c>).
+    /// Typed as <see cref="object"/> so Core stays free of WinUI references.
+    /// Created by the WinUI layer on the UI thread after <see cref="IconBytes"/>
+    /// is resolved — binding directly to bytes via a converter would block the UI
+    /// thread on each row's image decode.
+    /// </summary>
+    public object? IconImage { get; init; }
+
+    /// <summary>
     /// Path to <c>AppxManifest.xml</c> inside <see cref="InstallLocation"/>, or
     /// <c>null</c> if the install location is missing/inaccessible.
     /// </summary>
