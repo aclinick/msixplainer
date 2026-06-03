@@ -32,7 +32,7 @@ public static class InstalledPackageService
     /// </summary>
     public static IReadOnlyList<InstalledPackage> List()
     {
-        if (!OperatingSystem.IsWindows())
+        if (!OperatingSystem.IsWindowsVersionAtLeast(10, 0, 19041))
             return Array.Empty<InstalledPackage>();
 
         return ListWindows(withIcons: true);
@@ -45,7 +45,7 @@ public static class InstalledPackageService
     /// </summary>
     public static IReadOnlyList<InstalledPackage> ListWithoutIcons()
     {
-        if (!OperatingSystem.IsWindows())
+        if (!OperatingSystem.IsWindowsVersionAtLeast(10, 0, 19041))
             return Array.Empty<InstalledPackage>();
 
         return ListWindows(withIcons: false);
