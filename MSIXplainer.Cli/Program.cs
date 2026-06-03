@@ -394,6 +394,10 @@ static class Program
         table.AddRow("Version", Markup.Escape(info.Version));
         table.AddRow("Publisher", Markup.Escape(info.PublisherLine));
         table.AddRow("Architecture", Markup.Escape(info.Architecture));
+        if (!string.IsNullOrEmpty(info.PackageFamilyName))
+            table.AddRow("Family Name", Markup.Escape(info.PackageFamilyName));
+        if (!string.IsNullOrEmpty(info.PackageFullName))
+            table.AddRow("Full Name", Markup.Escape(info.PackageFullName));
         table.AddRow("Min OS", Markup.Escape(info.MinOsVersion));
         table.AddRow("Frameworks", Markup.Escape(info.FrameworkDependencies));
 
