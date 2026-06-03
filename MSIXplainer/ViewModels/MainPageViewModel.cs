@@ -58,6 +58,32 @@ public partial class MainPageViewModel : ObservableObject
     public ObservableCollection<ManifestFinding> ReviewFindings { get; } = [];
     public ObservableCollection<ManifestFinding> InfoFindings { get; } = [];
 
+    /// <summary>
+    /// Installed MSIX/AppX packages on this machine (issue #13). Populated lazily
+    /// the first time the user expands the "Apps" nav item via <see cref="LoadInstalledAppsCommand"/>.
+    /// </summary>
+    public ObservableCollection<InstalledPackage> InstalledPackages { get; } = [];
+
+    [ObservableProperty]
+    public partial bool IsLoadingInstalledApps { get; set; }
+
+    [ObservableProperty]
+    public partial bool HasLoadedInstalledApps { get; set; }
+
+    /// <summary>
+    /// When true, the content area shows the Compare-Versions view (inner Frame)
+    /// instead of the welcome/analysis content. Toggled by the nav rail.
+    /// </summary>
+    [ObservableProperty]
+    public partial bool IsCompareMode { get; set; }
+
+    /// <summary>
+    /// When true, the Apps secondary pane (Outlook-style second column) is visible
+    /// between the nav rail and the main content area. Toggled by the Apps nav item.
+    /// </summary>
+    [ObservableProperty]
+    public partial bool IsAppsPaneOpen { get; set; }
+
     /// <summary>Raised when sections are rebuilt so code-behind can refresh NavigationView items.</summary>
     public event Action? SectionsRebuilt;
 
@@ -181,6 +207,127 @@ public partial class MainPageViewModel : ObservableObject
 
     [RelayCommand]
     private void DismissSelectedFinding() => SelectedFinding = null;
+
+    /// <summary>
+    /// Loads the list of installed MSIX/AppX packages in two passes for snappy UX:
+    /// (1) fast WinRT enumeration without icons (~0.4s) → list visible immediately;
+    /// (2) background icon resolution that streams each row's icon in as it resolves.
+    /// Cancellable so closing the pane mid-resolution stops the work.
+    /// </summary>
+    [RelayCommand]
+    private async Task LoadInstalledAppsAsync()
+    {
+        if (IsLoadingInstalledApps) return;
+        if (HasLoadedInstalledApps && InstalledPackages.Count > 0) return;
+
+        // Replace any in-flight icon-resolution loop from a previous open.
+        _iconResolveCts?.Cancel();
+        _iconResolveCts?.Dispose();
+        _iconResolveCts = new CancellationTokenSource();
+        var token = _iconResolveCts.Token;
+
+        IsLoadingInstalledApps = true;
+        try
+        {
+            // Pass 1: fast enumeration without icons. Returns in <1s typically.
+            var packages = await Task.Run(InstalledPackageService.ListWithoutIcons, token);
+
+            InstalledPackages.Clear();
+            foreach (var p in packages)
+                InstalledPackages.Add(p);
+
+            HasLoadedInstalledApps = true;
+            IsLoadingInstalledApps = false;
+
+            // Pass 2: stream icons in. Fire-and-forget so the UI is responsive
+            // immediately. Exceptions are swallowed inside ResolveIcon.
+            _ = ResolveIconsAsync(token);
+        }
+        catch (OperationCanceledException)
+        {
+            IsLoadingInstalledApps = false;
+        }
+        catch (Exception ex)
+        {
+            IsLoadingInstalledApps = false;
+            ShowError($"Failed to list installed packages: {ex.Message}");
+        }
+    }
+
+    private async Task ResolveIconsAsync(CancellationToken token)
+    {
+        // Snapshot indices to avoid reacting to user-driven collection edits.
+        // Walk the collection; for each row, resolve the icon on a background
+        // thread then marshal the replacement back to the UI thread.
+        for (int i = 0; i < InstalledPackages.Count; i++)
+        {
+            if (token.IsCancellationRequested) return;
+
+            var current = InstalledPackages[i];
+            if (current.IconBytes is { Length: > 0 }) continue;
+
+            InstalledPackage resolved;
+            try
+            {
+                resolved = await Task.Run(() => InstalledPackageService.ResolveIcon(current), token);
+            }
+            catch (OperationCanceledException) { return; }
+            catch { continue; }
+
+            if (token.IsCancellationRequested) return;
+            if (resolved.IconBytes is not { Length: > 0 }) continue;
+
+            // Re-find by family name in case the collection shifted (defensive;
+            // we don't mutate it during pass 2 today but this keeps the row update safe).
+            var idx = IndexOfByFamilyName(resolved.PackageFamilyName);
+            if (idx >= 0)
+                InstalledPackages[idx] = resolved;
+        }
+    }
+
+    private int IndexOfByFamilyName(string pfn)
+    {
+        for (int i = 0; i < InstalledPackages.Count; i++)
+        {
+            if (string.Equals(InstalledPackages[i].PackageFamilyName, pfn, StringComparison.OrdinalIgnoreCase))
+                return i;
+        }
+        return -1;
+    }
+
+    /// <summary>Cancels any in-flight icon-resolution loop. Call when the Apps pane closes.</summary>
+    public void CancelIconResolution()
+    {
+        _iconResolveCts?.Cancel();
+    }
+
+    private CancellationTokenSource? _iconResolveCts;
+
+    /// <summary>
+    /// Loads an installed package's manifest and runs it through the existing
+    /// analysis pipeline. Wired to the Apps submenu items in MainPage.
+    /// </summary>
+    public void OpenInstalledPackage(InstalledPackage package)
+    {
+        if (package.ManifestPath is null || !File.Exists(package.ManifestPath))
+        {
+            ShowError(
+                $"AppxManifest.xml not accessible at '{package.InstallLocation}'. " +
+                "WindowsApps folders may require elevated access for some packages.");
+            return;
+        }
+
+        try
+        {
+            PackageFilePath = $"Installed: {package.DisplayName} ({package.PackageFamilyName})";
+            var (manifest, rawXml, info) = ManifestParserService.ExtractFromManifestFile(package.ManifestPath);
+            AnalyzeManifest(rawXml, info, manifest);
+        }
+        catch (Exception ex)
+        {
+            ShowError($"Failed to analyze installed package: {ex.Message}");
+        }
+    }
 
     public void SelectSection(string tag)
     {

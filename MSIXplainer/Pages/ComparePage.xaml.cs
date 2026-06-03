@@ -1,5 +1,6 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
 using MSIXplainer.ViewModels;
 
 namespace MSIXplainer.Pages;
@@ -15,10 +16,19 @@ public sealed partial class ComparePage : Page
 
     private void OnBackClick(object sender, RoutedEventArgs e)
     {
-        if (Frame.CanGoBack)
+        // ComparePage is hosted in MainPage's inner CompareFrame; walking up the visual tree
+        // to find MainPage lets the back button exit Compare mode cleanly without a Frame
+        // navigation stack. Falls back to the outer Frame.GoBack for any other host.
+        var parent = VisualTreeHelper.GetParent(this);
+        while (parent is not null && parent is not MainPage)
+            parent = VisualTreeHelper.GetParent(parent);
+
+        if (parent is MainPage main)
+            main.ExitCompareMode();
+        else if (Frame is not null && Frame.CanGoBack)
             Frame.GoBack();
         else
-            Frame.Navigate(typeof(MainPage));
+            Frame?.Navigate(typeof(MainPage));
     }
 
     // ── x:Bind helper functions ──
