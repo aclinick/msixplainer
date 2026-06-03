@@ -353,4 +353,29 @@ public class UpdateDiffBundleTests
             File.Delete(newBundle);
         }
     }
+
+    [Fact]
+    public void BundleManifestParser_SkipsStubPackages()
+    {
+        // Real DesktopAppInstaller bundles include stub packages whose FileName
+        // attribute is "AppxMetadata\Stub\AppInstaller_x64_stub.msix". These are
+        // metadata-only placeholders (no real payload), so the parser must skip
+        // them — otherwise UpdateDiffService later tries to read their block map
+        // and fails with "Bundle does not contain expected inner package".
+        var xml = $$"""
+            <?xml version="1.0" encoding="utf-8"?>
+            <Bundle xmlns="{{BundleNs.NamespaceName}}">
+              <Identity Name="Test.App" Publisher="CN=Test" Version="1.0.0.0" />
+              <Packages>
+                <Package Type="application" Version="1.0.0.0" Architecture="x64" FileName="App_x64.msix" Size="100" Offset="0" />
+                <Package Type="application" Version="1.0.0.0" Architecture="x64" FileName="AppxMetadata\Stub\App_x64_stub.msix" Size="50" Offset="0" />
+              </Packages>
+            </Bundle>
+            """;
+
+        var inners = BundleManifestParser.Parse(xml);
+
+        Assert.Single(inners);
+        Assert.Equal("App_x64.msix", inners[0].FileName);
+    }
 }
