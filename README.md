@@ -9,6 +9,14 @@ Instead of reading raw XML, you get categorized findings with severity ratings, 
 
 ---
 
+## Screenshots
+
+| WinUI app | CLI |
+|---|---|
+| ![WinUI app](docs/screenshots/ui.png) | ![CLI output](docs/screenshots/cli.png) |
+
+---
+
 ## What It Does
 
 MSIXplainer is two tools in one:
