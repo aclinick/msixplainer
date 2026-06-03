@@ -180,9 +180,9 @@ foreach ($platform in $platforms) {
     # actual .NET 10 runtime DLLs (coreclr.dll, System.*.dll, etc.) in the same
     # package folder, so we don't duplicate the runtime.
     if ($msbuild) {
-        & $msbuild $cliProject /nologo /v:m /restore /t:Publish /p:Configuration=Release /p:Platform=$platform /p:RuntimeIdentifier=win-$rid /p:SelfContained=true /p:PublishSingleFile=false /p:PublishTrimmed=false /p:Version=$manifestVersion /p:InformationalVersion=$manifestVersion
+        & $msbuild $cliProject /nologo /v:m /restore /t:Publish /p:Configuration=Release /p:Platform=$platform /p:RuntimeIdentifier=win-$rid /p:SelfContained=true /p:PublishSingleFile=false /p:PublishTrimmed=false /p:InformationalVersion=$manifestVersion
     } else {
-        dotnet publish $cliProject -c Release -p:Platform=$platform -r win-$rid --self-contained true -p:PublishSingleFile=false -p:PublishTrimmed=false -p:Version=$manifestVersion -p:InformationalVersion=$manifestVersion -v m
+        dotnet publish $cliProject -c Release -p:Platform=$platform -r win-$rid --self-contained true -p:PublishSingleFile=false -p:PublishTrimmed=false -p:InformationalVersion=$manifestVersion -v m
     }
     if ($LASTEXITCODE -ne 0) {
         Write-Host "ERROR: $platform CLI build failed." -ForegroundColor Red
