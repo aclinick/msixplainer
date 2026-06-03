@@ -11,62 +11,31 @@ Instead of reading raw XML, you get categorized findings with severity ratings, 
 
 ## What It Does
 
-- **Opens `.msix` or `.appx` files** and extracts the manifest safely (package is treated as untrusted input — no code is executed)
-- **Analyzes 18 security-relevant categories**: trust level, restricted capabilities, standard capabilities, device access, network access, virtualization bypasses, startup tasks, protocol handlers, app URI handlers, file associations, COM registrations, background tasks, Office integration, WebView2, VDI indicators, Windows services, allowElevation bypass, and identity validation
-- **Explains every manifest section** in plain English with severity tags (`🔴 CRITICAL`, `🟡 WARNING`, `🔵 REVIEW`, `ℹ️ INFO`)
-- **Exports** annotated Markdown reports (section-by-section walkthrough with XML snippets and explanation tables) and structured JSON
-- **Uses a local deterministic rules engine** — no cloud service, no LLM dependency
+MSIXplainer is two tools in one:
 
-## Screenshots
+**1. Manifest review** — opens any `.msix` / `.appx` / `.msixbundle` / `.appxbundle` and turns the manifest into a plain-English security review:
 
-### CLI Output
+- Categorized findings across **18 security-relevant areas** (trust level, restricted capabilities, virtualization, services, COM, protocols, file associations, background tasks, WebView2, and more)
+- Severity tags (`🔴 CRITICAL`, `🟡 WARNING`, `🔵 REVIEW`, `ℹ️ INFO`) and per-rule explanations of *what it does, why an app might need it, and what an IT Pro should care about*
+- Tunable severities via a local `rules.json` (CI-friendly)
+- Exports to annotated Markdown or structured JSON
 
-```
-$ msixplainer contoso-hub.msix
+**2. Update diff & bandwidth planner** — compares two versions of a package and tells you how much would actually download for an update:
 
-╭──────────────────────────────────────────────╮
-│  MSIXplainer                     │
-╰──────────────────────────────────────────────╯
+- Byte-exact parity with Microsoft's `comparepackage.exe` (Windows SDK) using `AppxBlockMap.xml` block-hash diffing
+- Handles flat packages and `.msixbundle` payloads (per-architecture)
+- Fleet rollout estimator: enter device count + link speeds + egress cost and get hours-to-deploy and dollar figures
+- Top-N changed files with size deltas, duplicate-file detection
+- Exports diff + planner numbers to Markdown or JSON
 
-┌────────────────────────────────────────────────┐
-│ Package Identity                               │
-├──────────────┬─────────────────────────────────┤
-│ Name         │ Contoso.CollaborationHub        │
-│ Version      │ 24.10.1.100                     │
-│ Architecture │ x64                             │
-│ Publisher    │ Contoso Ltd                     │
-│ Min OS       │ 10.0.19041.0                    │
-└──────────────┴─────────────────────────────────┘
-
-  Risk: 2 critical · 6 warning · 8 review · 3 info
-
-  Findings
-  ├── 🔴 Critical
-  │   ├── Runs with Full Trust
-  │   └── Restricted capability: broadFileSystemAccess
-  ├── 🟡 Warning
-  │   ├── Filesystem virtualization DISABLED
-  │   ├── Registry virtualization DISABLED
-  │   └── ...
-  └── 🔵 Review
-      ├── Protocol handler: contoso-hub://
-      └── ...
-```
-
-### CLI Markdown Export Example
-
-```powershell
-$ msixplainer contoso-hub.msix --markdown --output review.md
-```
-
----
+Everything runs locally. **No cloud service, no LLM, no telemetry, no network calls.** Packages are treated as untrusted input — no code from a package is ever executed.
 
 ## Getting Started
 
 ### Prerequisites
 
 - Windows 10 version 2004 (build 19041) or later
-- [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) (preview)
+- [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
 - Windows App SDK 2.0+ (for the WinUI app)
 
 ### Build
@@ -109,6 +78,23 @@ dotnet run --project MSIXplainer.Cli -- package.msix --quiet
 # Analyze multiple packages with glob
 dotnet run --project MSIXplainer.Cli -- "C:\packages\*.msix"
 ```
+
+### Compare Two Packages (update diff)
+
+```powershell
+# How much would a v1.0 → v1.1 update actually download?
+dotnet run --project MSIXplainer.Cli -- diff old.msix new.msix
+
+# Add a fleet-rollout bandwidth + cost estimate
+dotnet run --project MSIXplainer.Cli -- diff old.msix new.msix `
+  --devices 5000 --link 100,1000 --cost 0.08
+
+# Export the comparison
+dotnet run --project MSIXplainer.Cli -- diff old.msix new.msix --markdown -o update.md
+dotnet run --project MSIXplainer.Cli -- diff old.msix new.msix --json -o update.json
+```
+
+The diff uses the same block-hash logic as Microsoft's `comparepackage.exe` (Windows SDK), so the byte counts match the SDK tool exactly.
 
 #### CLI Exit Codes
 
