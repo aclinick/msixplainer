@@ -69,40 +69,42 @@ dotnet build MSIXplainer
 
 ```powershell
 # Analyze a real package
-dotnet run --project MSIXplainer.Cli -- path\to\package.msix
+msixplainer path\to\package.msix
 
 # Use the built-in sample manifest (Contoso Collaboration Hub)
-dotnet run --project MSIXplainer.Cli -- --sample
+msixplainer --sample
 
 # Export to Markdown
-dotnet run --project MSIXplainer.Cli -- --sample --markdown --output review.md
+msixplainer --sample --markdown --output review.md
 
 # Export to JSON
-dotnet run --project MSIXplainer.Cli -- --sample --json
+msixplainer --sample --json
 
 # Filter by severity
-dotnet run --project MSIXplainer.Cli -- package.msix --severity warning
+msixplainer package.msix --severity warning
 
 # Quiet mode (exit code only — useful for CI)
-dotnet run --project MSIXplainer.Cli -- package.msix --quiet
+msixplainer package.msix --quiet
 
 # Analyze multiple packages with glob
-dotnet run --project MSIXplainer.Cli -- "C:\packages\*.msix"
+msixplainer "C:\packages\*.msix"
 ```
+
+> During development, replace `msixplainer` with `dotnet run --project MSIXplainer.Cli --`.
 
 ### Compare Two Packages (update diff)
 
 ```powershell
 # How much would a v1.0 → v1.1 update actually download?
-dotnet run --project MSIXplainer.Cli -- diff old.msix new.msix
+msixplainer diff old.msix new.msix
 
 # Add a fleet-rollout bandwidth + cost estimate
-dotnet run --project MSIXplainer.Cli -- diff old.msix new.msix `
+msixplainer diff old.msix new.msix `
   --devices 5000 --link 100,1000 --cost 0.08
 
 # Export the comparison
-dotnet run --project MSIXplainer.Cli -- diff old.msix new.msix --markdown -o update.md
-dotnet run --project MSIXplainer.Cli -- diff old.msix new.msix --json -o update.json
+msixplainer diff old.msix new.msix --markdown -o update.md
+msixplainer diff old.msix new.msix --json -o update.json
 ```
 
 The diff uses the same block-hash logic as Microsoft's `comparepackage.exe` (Windows SDK), so the byte counts match the SDK tool exactly.
