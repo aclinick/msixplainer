@@ -310,15 +310,47 @@ public class UpdateDiffBundleTests
 
             var app = inners.Single(i => i.IsApplication);
             Assert.Equal("x64", app.Architecture);
-            Assert.Equal("app|x64", app.MatchKey);
+            Assert.Equal("app|x64|||", app.MatchKey);
 
             var res = inners.Single(i => i.IsResource);
             Assert.Equal("en-us", res.ResourceId);
-            Assert.Equal("resource|en-us", res.MatchKey);
+            Assert.Equal("resource|neutral|en-us||", res.MatchKey);
         }
         finally
         {
             File.Delete(bundle);
+        }
+    }
+
+    [Fact]
+    public void CompareBundles_HandlesMultipleInnersWithSameArchitecture()
+    {
+        // Some real-world bundles (e.g. Microsoft.DesktopAppInstaller) ship more
+        // than one application-type inner package for the same architecture
+        // (main app + companion/asset partitions). Earlier versions of the diff
+        // service used `app|{arch}` as the key and crashed with
+        // "An item with the same key has already been added. Key: app|x64".
+        // This regression test pins the new behavior: we no longer throw.
+        var oldBundle = CreateBundle(
+            new InnerSpec("App_x64.msix", "application", "x64", "", "1.0.0.0",
+                [new SyntheticFile("App.exe", Bytes("a", 100))]),
+            new InnerSpec("Extras_x64.msix", "application", "x64", "extras", "1.0.0.0",
+                [new SyntheticFile("Extras.dll", Bytes("b", 100))]));
+        var newBundle = CreateBundle(
+            new InnerSpec("App_x64.msix", "application", "x64", "", "1.1.0.0",
+                [new SyntheticFile("App.exe", Bytes("a", 100))]),
+            new InnerSpec("Extras_x64.msix", "application", "x64", "extras", "1.1.0.0",
+                [new SyntheticFile("Extras.dll", Bytes("b", 100))]));
+
+        try
+        {
+            var result = UpdateDiffService.CompareBundles(oldBundle, newBundle);
+            Assert.Equal(2, result.PackageDiffs.Count);
+        }
+        finally
+        {
+            File.Delete(oldBundle);
+            File.Delete(newBundle);
         }
     }
 }

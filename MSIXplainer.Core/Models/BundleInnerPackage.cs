@@ -32,14 +32,21 @@ public sealed class BundleInnerPackage
     public bool IsResource => string.Equals(Type, "resource", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
-    /// Stable matching key for pairing the same logical package across two bundles.
-    /// Application packages key on architecture; resource packages key on
-    /// ResourceId (which typically encodes the qualifier such as language or scale).
+    /// Stable matching key for pairing the same logical inner package across two bundles.
+    /// Uses the bundle-manifest identity attributes (type, architecture, resourceId)
+    /// plus language/scale qualifiers so split resource partitions with the same
+    /// architecture don't collide.
     /// </summary>
-    public string MatchKey =>
-        IsApplication
-            ? $"app|{Architecture.ToLowerInvariant()}"
-            : $"resource|{ResourceId.ToLowerInvariant()}";
+    public string MatchKey
+    {
+        get
+        {
+            var langs = string.Join(",", Languages.Select(l => l.ToLowerInvariant()).OrderBy(l => l, StringComparer.Ordinal));
+            var scales = string.Join(",", Scales.Select(s => s.ToLowerInvariant()).OrderBy(s => s, StringComparer.Ordinal));
+            var kind = IsApplication ? "app" : "resource";
+            return $"{kind}|{Architecture.ToLowerInvariant()}|{ResourceId.ToLowerInvariant()}|{langs}|{scales}";
+        }
+    }
 
     /// <summary>Short human-readable label, e.g. "x64", "resources.en-us", "scale-200".</summary>
     public string Label
