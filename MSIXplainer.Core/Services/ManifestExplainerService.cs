@@ -30,32 +30,31 @@ public static class ManifestExplainerService
             {
                 Tag = "overview",
                 Label = "Overview",
-                IconGlyph = "\uE80F",
+                IconGlyph = "\uE946", // Info ⓘ — Overview = summary/info, not "home"
                 FindingCount = findings.Count,
                 WorstSeverity = findings.Count > 0 ? findings.Max(f => f.Severity) : FindingSeverity.Info
             }
         };
 
         if (root.Element(Ns + "Identity") is not null)
-            sections.Add(MakeSection("identity", "Identity", "\uE77B", findings, FindingCategory.Identity));
+            sections.Add(MakeSection("identity", "Identity", "\uE77B", findings, FindingCategory.Identity)); // Contact
 
         if (root.Elements(Ns + "Properties").Any())
-            sections.Add(MakeSection("properties", "Properties", "\uE8A1", findings, FindingCategory.Virtualization));
+            sections.Add(MakeSection("properties", "Properties", "\uE713", findings, FindingCategory.Virtualization)); // Settings (gear)
 
         if (root.Element(Ns + "Dependencies") is not null)
-            sections.Add(new ManifestSection { Tag = "dependencies", Label = "Dependencies", IconGlyph = "\uE74C" });
+            sections.Add(new ManifestSection { Tag = "dependencies", Label = "Dependencies", IconGlyph = "\uE71B" }); // Link (dependencies reference other packages)
 
         if (root.Element(Ns + "Resources") is not null)
-            sections.Add(new ManifestSection { Tag = "resources", Label = "Resources", IconGlyph = "\uE774" });
+            sections.Add(new ManifestSection { Tag = "resources", Label = "Resources", IconGlyph = "\uE774" }); // Globe (localized resources)
 
-        var apps = root.Element(Ns + "Applications")?.Elements(Ns + "Application") ?? [];
-        foreach (var app in apps)
+        var apps = root.Element(Ns + "Applications")?.Elements(Ns + "Application").ToList() ?? [];
+        if (apps.Count > 0)
         {
-            var appId = app.Attribute("Id")?.Value ?? "App";
-            var displayName = app.Descendants()
-                .FirstOrDefault(e => e.Name.LocalName == "VisualElements")
-                ?.Attribute("DisplayName")?.Value ?? appId;
-
+            // Collapse all <Application> elements into a single "Applications" nav entry.
+            // Previously we created one nav item per Application, which produced 3-5+ entries
+            // with ms-resource:... labels — pure menu noise. The content side renders one
+            // PropertyGroup per Application.
             var appCategories = new[] {
                 FindingCategory.Trust, FindingCategory.Startup, FindingCategory.Protocols,
                 FindingCategory.FileAssociations, FindingCategory.BackgroundTasks,
@@ -65,8 +64,8 @@ public static class ManifestExplainerService
 
             sections.Add(new ManifestSection
             {
-                Tag = $"app:{appId}",
-                Label = displayName,
+                Tag = "applications",
+                Label = apps.Count == 1 ? "Application" : $"Applications ({apps.Count})",
                 IconGlyph = "\uE737",
                 IconBytes = appIconBytes,
                 FindingCount = appFindings.Count,
@@ -104,6 +103,16 @@ public static class ManifestExplainerService
         if (tag == "dependencies") return ExplainDependencies(root);
         if (tag == "resources") return ExplainResources(root);
         if (tag == "capabilities") return ExplainCapabilities(root, findings);
+        if (tag == "applications")
+        {
+            var groups = new List<ManifestPropertyGroup>();
+            foreach (var app in root.Descendants(Ns + "Application"))
+            {
+                groups.AddRange(ExplainApplication(app, findings));
+            }
+            return groups;
+        }
+        // Legacy per-app tag still supported in case anything stored it.
         if (tag.StartsWith("app:"))
         {
             var appId = tag[4..];

@@ -10,51 +10,145 @@
     xmlns:models="using:MSIXplainer.Models"
     mc:Ignorable="d">
 
-    <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-        </Grid.RowDefinitions>
+    <!-- ═══ Body: Bandwidth Planner sidebar (left) + scrollable content (right) ═══ -->
+    <Grid ColumnSpacing="0">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
 
-        <!-- ═══ Toolbar ═══ -->
-        <Grid Grid.Row="0" Padding="16,12" ColumnSpacing="8"
-              BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
-              BorderThickness="0,0,0,1">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="*" />
-            </Grid.ColumnDefinitions>
+            <!-- ── Bandwidth Planner sidebar: always visible (mirrors the Sections-pane
+                 pattern from MainPage). Title + intro at top; Export action buttons
+                 appear at the bottom once a comparison has results. ── -->
+            <Border Grid.Column="0" Width="280"
+                    Background="{ThemeResource LayerFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                    BorderThickness="0,0,1,0">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
 
-            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8">
-                <Button AutomationProperties.AutomationId="BtnBackToAnalyse"
-                        Click="OnBackClick"
-                        Style="{StaticResource SubtleButtonStyle}">
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <FontIcon Glyph="&#xE72B;" FontSize="16" />
-                        <TextBlock Text="Back to Analyse" />
+                    <!-- Title / intro -->
+                    <StackPanel Grid.Row="0" Spacing="8" Padding="16,16,16,12">
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <FontIcon Glyph="&#xE8AB;" FontSize="20"
+                                      VerticalAlignment="Center" />
+                            <TextBlock Text="Compare Versions"
+                                       Style="{StaticResource SubtitleTextBlockStyle}"
+                                       VerticalAlignment="Center" />
+                        </StackPanel>
+                        <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                   Style="{StaticResource CaptionTextBlockStyle}"
+                                   TextWrapping="Wrap"
+                                   Text="Pick two MSIX versions and analyze the delta: what's changed, how big the update download will be, and where you can deduplicate." />
                     </StackPanel>
-                </Button>
-            </StackPanel>
 
-            <TextBlock Grid.Column="1"
-                       Text="Compare Versions"
-                       VerticalAlignment="Center"
-                       HorizontalAlignment="Center"
-                       Style="{StaticResource SubtitleTextBlockStyle}" />
-        </Grid>
+                    <!-- ── Tool nav: Diff / Bandwidth Planner / Duplicates. Visible only
+                         after a comparison has results so the user has something to view. ── -->
+                    <ListView Grid.Row="1"
+                              x:Name="CompareToolNav"
+                              AutomationProperties.AutomationId="CompareToolNav"
+                              SelectionMode="Single"
+                              SelectionChanged="OnCompareToolSelectionChanged"
+                              Loaded="OnCompareToolNavLoaded"
+                              Background="Transparent"
+                              Visibility="{x:Bind local:ComparePage.BoolToVisibility(ViewModel.HasResult), Mode=OneWay}">
+                        <ListView.ItemContainerStyle>
+                            <Style TargetType="ListViewItem">
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                <Setter Property="Padding" Value="12,8" />
+                                <Setter Property="Margin" Value="4,2" />
+                            </Style>
+                        </ListView.ItemContainerStyle>
+                        <ListViewItem Tag="diff"
+                                      AutomationProperties.AutomationId="CompareNavDiff">
+                            <Grid ColumnSpacing="12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <FontIcon Grid.Column="0" Glyph="&#xE8CB;" FontSize="16"
+                                          VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="1" Text="Diff"
+                                           VerticalAlignment="Center" />
+                                <InfoBadge Grid.Column="2"
+                                           Value="{x:Bind ViewModel.FileChangeCount, Mode=OneWay}"
+                                           VerticalAlignment="Center" />
+                            </Grid>
+                        </ListViewItem>
+                        <ListViewItem Tag="planner"
+                                      AutomationProperties.AutomationId="CompareNavPlanner">
+                            <StackPanel Orientation="Horizontal" Spacing="12">
+                                <FontIcon Glyph="&#xE9D9;" FontSize="16"
+                                          VerticalAlignment="Center" />
+                                <TextBlock Text="Bandwidth Planner"
+                                           VerticalAlignment="Center" />
+                            </StackPanel>
+                        </ListViewItem>
+                        <ListViewItem Tag="duplicates"
+                                      AutomationProperties.AutomationId="CompareNavDuplicates">
+                            <Grid ColumnSpacing="12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <FontIcon Grid.Column="0" Glyph="&#xE8C8;" FontSize="16"
+                                          VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="1" Text="Duplicates"
+                                           VerticalAlignment="Center" />
+                                <InfoBadge Grid.Column="2"
+                                           Value="{x:Bind ViewModel.DuplicateGroupCount, Mode=OneWay}"
+                                           VerticalAlignment="Center"
+                                           Visibility="{x:Bind local:ComparePage.BoolToVisibility(ViewModel.HasDuplicates), Mode=OneWay}" />
+                            </Grid>
+                        </ListViewItem>
+                    </ListView>
 
-        <ScrollViewer Grid.Row="1" Padding="24" VerticalScrollBarVisibility="Auto">
+                    <!-- Footer: Export action buttons (visible after a comparison runs) -->
+                    <StackPanel Grid.Row="2" Spacing="4" Padding="12,8,12,12"
+                                BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                                BorderThickness="0,1,0,0"
+                                Visibility="{x:Bind local:ComparePage.BoolToVisibility(ViewModel.HasResult), Mode=OneWay}">
+                        <Button AutomationProperties.AutomationId="BtnExportMarkdown"
+                                Command="{x:Bind ViewModel.ExportMarkdownCommand}"
+                                HorizontalAlignment="Stretch"
+                                HorizontalContentAlignment="Left"
+                                Style="{StaticResource SubtleButtonStyle}">
+                            <StackPanel Orientation="Horizontal" Spacing="12">
+                                <FontIcon Glyph="&#xE8A5;" FontSize="16" />
+                                <TextBlock Text="Export to Markdown" />
+                            </StackPanel>
+                        </Button>
+                        <Button AutomationProperties.AutomationId="BtnExportJson"
+                                Command="{x:Bind ViewModel.ExportJsonCommand}"
+                                HorizontalAlignment="Stretch"
+                                HorizontalContentAlignment="Left"
+                                Style="{StaticResource SubtleButtonStyle}">
+                            <StackPanel Orientation="Horizontal" Spacing="12">
+                                <FontIcon Glyph="&#xE74E;" FontSize="16" />
+                                <TextBlock Text="Export to JSON" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <ScrollViewer Grid.Column="1" Padding="24" VerticalScrollBarVisibility="Auto">
             <StackPanel Spacing="20" MaxWidth="1100" HorizontalAlignment="Stretch">
 
-                <TextBlock Text="Estimate the on-wire download size of an MSIX update"
-                           Style="{StaticResource TitleTextBlockStyle}" />
                 <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                            TextWrapping="Wrap"
                            Text="Pick the currently installed package version and a newer version. MSIXplainer reads the AppxBlockMap of each and reports exactly which blocks must travel over the wire — the same block-reuse mechanism the platform uses for updates." />
 
-                <Grid ColumnSpacing="16" RowSpacing="12">
+                <Grid ColumnSpacing="12" RowSpacing="12">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
                     <Grid.RowDefinitions>
@@ -65,7 +159,7 @@
                     <TextBlock Grid.Row="0" Grid.Column="0"
                                Text="Old version (currently installed)"
                                Style="{StaticResource BodyStrongTextBlockStyle}" />
-                    <TextBlock Grid.Row="0" Grid.Column="1"
+                    <TextBlock Grid.Row="0" Grid.Column="2"
                                Text="New version (target)"
                                Style="{StaticResource BodyStrongTextBlockStyle}" />
 
@@ -88,7 +182,17 @@
                         </Button>
                     </Grid>
 
-                    <Grid Grid.Row="1" Grid.Column="1" ColumnSpacing="8">
+                    <!-- Swap button: flip Old↔New paths in one click when users picked them in the wrong order -->
+                    <Button Grid.Row="1" Grid.Column="1"
+                            AutomationProperties.AutomationId="BtnSwapPaths"
+                            Command="{x:Bind ViewModel.SwapPathsCommand}"
+                            ToolTipService.ToolTip="Swap old and new"
+                            VerticalAlignment="Stretch"
+                            Padding="10,0">
+                        <FontIcon Glyph="&#xE8AB;" FontSize="14" />
+                    </Button>
+
+                    <Grid Grid.Row="1" Grid.Column="2" ColumnSpacing="8">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
@@ -130,6 +234,21 @@
 
                 <StackPanel Spacing="20"
                             Visibility="{x:Bind local:ComparePage.BoolToVisibility(ViewModel.HasResult), Mode=OneWay}">
+
+                    <!-- Warnings are shared across all three sub-views -->
+                    <ItemsControl ItemsSource="{x:Bind ViewModel.Warnings}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="x:String">
+                                <InfoBar IsOpen="True" Severity="Warning" Title="Warning"
+                                         Message="{x:Bind}" IsClosable="False"
+                                         Margin="0,0,0,8" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <!-- ═══ DIFF VIEW: headline cards + file inventory + per-package + top changes ═══ -->
+                    <StackPanel Spacing="20"
+                                Visibility="{x:Bind local:ComparePage.BoolToVisibility(ViewModel.IsDiffView), Mode=OneWay}">
 
                     <Border Background="{ThemeResource LayerFillColorDefaultBrush}"
                             BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
@@ -266,18 +385,13 @@
                         </StackPanel>
                     </Border>
 
-                    <ItemsControl ItemsSource="{x:Bind ViewModel.Warnings}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="x:String">
-                                <InfoBar IsOpen="True" Severity="Warning" Title="Warning"
-                                         Message="{x:Bind}" IsClosable="False"
-                                         Margin="0,0,0,8" />
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
+                    </StackPanel>
+                    <!-- ═══ END DIFF VIEW PART 1 (per-package + top contributors come back below in DIFF VIEW PART 2) ═══ -->
 
-                    <TextBlock Text="Bandwidth Planner"
-                               Style="{StaticResource SubtitleTextBlockStyle}" />
+                    <!-- ═══ BANDWIDTH PLANNER VIEW: fleet inputs + per-link projections ═══ -->
+                    <StackPanel Spacing="20"
+                                Visibility="{x:Bind local:ComparePage.BoolToVisibility(ViewModel.IsBandwidthView), Mode=OneWay}">
+
                     <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                TextWrapping="Wrap"
                                Text="Multiply per-device download by your fleet size and project against typical link speeds." />
@@ -383,6 +497,12 @@
                             </ListView>
                         </StackPanel>
                     </Border>
+                    </StackPanel>
+                    <!-- ═══ END BANDWIDTH PLANNER VIEW ═══ -->
+
+                    <!-- ═══ DIFF VIEW (part 2): per-package breakdown + top contributors ═══ -->
+                    <StackPanel Spacing="20"
+                                Visibility="{x:Bind local:ComparePage.BoolToVisibility(ViewModel.IsDiffView), Mode=OneWay}">
 
                     <TextBlock Text="Per-package breakdown"
                                Style="{StaticResource SubtitleTextBlockStyle}" />
@@ -451,33 +571,8 @@
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
 
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="Top contributors to the update download"
-                                   Style="{StaticResource SubtitleTextBlockStyle}"
-                                   VerticalAlignment="Center" />
-                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
-                            <Button AutomationProperties.AutomationId="BtnExportMarkdown"
-                                    Command="{x:Bind ViewModel.ExportMarkdownCommand}"
-                                    Style="{StaticResource SubtleButtonStyle}">
-                                <StackPanel Orientation="Horizontal" Spacing="6">
-                                    <FontIcon Glyph="&#xE8A5;" FontSize="14" />
-                                    <TextBlock Text="Export Markdown" />
-                                </StackPanel>
-                            </Button>
-                            <Button AutomationProperties.AutomationId="BtnExportJson"
-                                    Command="{x:Bind ViewModel.ExportJsonCommand}"
-                                    Style="{StaticResource SubtleButtonStyle}">
-                                <StackPanel Orientation="Horizontal" Spacing="6">
-                                    <FontIcon Glyph="&#xE943;" FontSize="14" />
-                                    <TextBlock Text="Export JSON" />
-                                </StackPanel>
-                            </Button>
-                        </StackPanel>
-                    </Grid>
+                    <TextBlock Text="Top contributors to the update download"
+                               Style="{StaticResource SubtitleTextBlockStyle}" />
                     <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                Text="Up to 50 files sorted by on-wire delta. These are the files driving the update size." />
                     <ListView ItemsSource="{x:Bind ViewModel.TopFileChanges}"
@@ -533,17 +628,34 @@
                             </DataTemplate>
                         </ListView.ItemTemplate>
                     </ListView>
+                    </StackPanel>
+                    <!-- ═══ END DIFF VIEW (part 2) ═══ -->
 
-                    <!-- Duplicate-file optimization opportunities -->
+                    <!-- ═══ DUPLICATES VIEW: optimization opportunities for duplicate files ═══ -->
                     <StackPanel Spacing="12"
-                                Visibility="{x:Bind local:ComparePage.BoolToVisibility(ViewModel.HasDuplicates), Mode=OneWay}">
+                                Visibility="{x:Bind local:ComparePage.BoolToVisibility(ViewModel.IsDuplicatesView), Mode=OneWay}">
                         <TextBlock Style="{StaticResource SubtitleTextBlockStyle}"
                                    Text="Optimization opportunity: duplicate files" />
                         <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                   AutomationProperties.AutomationId="DuplicatesHeadline"
-                                   Text="{x:Bind ViewModel.DuplicatesHeadline, Mode=OneWay}" />
-                        <ListView ItemsSource="{x:Bind ViewModel.DuplicateGroups}"
-                                  SelectionMode="None">
+                                   TextWrapping="Wrap"
+                                   Text="Files with identical content that appear in multiple locations within the new package. Deduplicating these can shrink install footprint and update size." />
+
+                        <!-- Empty-state when no duplicates were found in the new package -->
+                        <InfoBar IsOpen="True"
+                                 Severity="Success"
+                                 Title="No duplicate files found"
+                                 Message="Every file in the new package is unique. Nothing to deduplicate."
+                                 IsClosable="False"
+                                 Visibility="{x:Bind local:ComparePage.BoolToVisibility(ViewModel.IsDuplicatesEmpty), Mode=OneWay}" />
+
+                        <!-- Results when duplicates are present -->
+                        <StackPanel Spacing="12"
+                                    Visibility="{x:Bind local:ComparePage.BoolToVisibility(ViewModel.HasDuplicates), Mode=OneWay}">
+                            <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                       AutomationProperties.AutomationId="DuplicatesHeadline"
+                                       Text="{x:Bind ViewModel.DuplicatesHeadline, Mode=OneWay}" />
+                            <ListView ItemsSource="{x:Bind ViewModel.DuplicateGroups}"
+                                      SelectionMode="None">
                             <ListView.ItemContainerStyle>
                                 <Style TargetType="ListViewItem">
                                     <Setter Property="HorizontalContentAlignment" Value="Stretch" />
@@ -590,11 +702,13 @@
                                     </Grid>
                                 </DataTemplate>
                             </ListView.ItemTemplate>
-                        </ListView>
+                            </ListView>
+                        </StackPanel>
                     </StackPanel>
+                    <!-- ═══ END DUPLICATES VIEW ═══ -->
 
                 </StackPanel>
             </StackPanel>
-        </ScrollViewer>
+            </ScrollViewer>
     </Grid>
 </Page>

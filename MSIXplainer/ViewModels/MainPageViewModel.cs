@@ -14,6 +14,8 @@ public partial class MainPageViewModel : ObservableObject
     [ObservableProperty]
     public partial bool IsPackageLoaded { get; set; }
 
+    partial void OnIsPackageLoadedChanged(bool value) => RecomputeSectionsPaneVisibility();
+
     [ObservableProperty]
     public partial PackageInfo? PackageInfo { get; set; }
 
@@ -58,8 +60,88 @@ public partial class MainPageViewModel : ObservableObject
     public ObservableCollection<ManifestFinding> ReviewFindings { get; } = [];
     public ObservableCollection<ManifestFinding> InfoFindings { get; } = [];
 
-    /// <summary>Raised when sections are rebuilt so code-behind can refresh NavigationView items.</summary>
-    public event Action? SectionsRebuilt;
+    /// <summary>
+    /// Installed MSIX/AppX packages on this machine (issue #13). Populated lazily
+    /// the first time the user expands the "Apps" nav item via <see cref="LoadInstalledAppsCommand"/>.
+    /// </summary>
+    public ObservableCollection<InstalledPackage> InstalledPackages { get; } = [];
+
+    [ObservableProperty]
+    public partial bool IsLoadingInstalledApps { get; set; }
+
+    [ObservableProperty]
+    public partial bool HasLoadedInstalledApps { get; set; }
+
+    /// <summary>
+    /// When true, the content area shows the Compare-Versions view (inner Frame)
+    /// instead of the welcome/analysis content. Toggled by the nav rail.
+    /// </summary>
+    [ObservableProperty]
+    public partial bool IsCompareMode { get; set; }
+
+    partial void OnIsCompareModeChanged(bool value)
+    {
+        RecomputeSectionsPaneVisibility();
+        IsHomeMode = !IsCompareMode && !IsSettingsMode;
+    }
+
+    /// <summary>
+    /// When true, the content area shows the Settings page (inner Frame) instead
+    /// of the welcome/analysis or Compare content. Mutually exclusive with
+    /// <see cref="IsCompareMode"/>; both must be false for the home/analysis
+    /// content to render.
+    /// </summary>
+    [ObservableProperty]
+    public partial bool IsSettingsMode { get; set; }
+
+    partial void OnIsSettingsModeChanged(bool value)
+    {
+        RecomputeSectionsPaneVisibility();
+        IsHomeMode = !IsCompareMode && !IsSettingsMode;
+    }
+
+    /// <summary>
+    /// True when neither Compare nor Settings is active — i.e. the welcome /
+    /// analysis content should be shown.
+    /// </summary>
+    [ObservableProperty]
+    public partial bool IsHomeMode { get; set; } = true;
+
+    /// <summary>
+    /// When true, the Apps secondary pane (Outlook-style second column) is visible
+    /// between the nav rail and the main content area. Toggled by the Apps nav item.
+    /// </summary>
+    [ObservableProperty]
+    public partial bool IsAppsPaneOpen { get; set; }
+
+    partial void OnIsAppsPaneOpenChanged(bool value) => RecomputeSectionsPaneVisibility();
+
+    /// <summary>
+    /// When true, the Sections secondary pane is visible in column 0 (mutually
+    /// exclusive with the Apps pane). A package must be loaded and we must not
+    /// be in Compare mode.
+    /// </summary>
+    [ObservableProperty]
+    public partial bool IsSectionsPaneVisible { get; set; }
+
+    /// <summary>
+    /// Two-way bound to the Sections ListView in the secondary pane. Changing this
+    /// dispatches to <see cref="SelectSection"/>; <see cref="SelectSection"/> also
+    /// writes back here so programmatic selection (e.g. "overview" on package load)
+    /// highlights the right row.
+    /// </summary>
+    [ObservableProperty]
+    public partial ManifestSection? SelectedSection { get; set; }
+
+    partial void OnSelectedSectionChanged(ManifestSection? value)
+    {
+        if (value is null) return;
+        if (value.Tag == SelectedSectionTag) return;
+        SelectSection(value.Tag);
+    }
+
+    private void RecomputeSectionsPaneVisibility() =>
+        IsSectionsPaneVisible = IsPackageLoaded && !IsCompareMode && !IsSettingsMode && !IsAppsPaneOpen;
 
     private List<ManifestFinding> _allFindings = [];
     private XElement? _manifestRoot;
@@ -182,12 +264,172 @@ public partial class MainPageViewModel : ObservableObject
     [RelayCommand]
     private void DismissSelectedFinding() => SelectedFinding = null;
 
+    /// <summary>
+    /// Loads the list of installed MSIX/AppX packages in two passes for snappy UX:
+    /// (1) fast WinRT enumeration without icons (~0.4s) → list visible immediately;
+    /// (2) background icon resolution that streams each row's icon in as it resolves.
+    /// Cancellable so closing the pane mid-resolution stops the work.
+    /// </summary>
+    [RelayCommand]
+    private async Task LoadInstalledAppsAsync()
+    {
+        if (IsLoadingInstalledApps) return;
+        if (HasLoadedInstalledApps && InstalledPackages.Count > 0) return;
+
+        // Replace any in-flight icon-resolution loop from a previous open.
+        _iconResolveCts?.Cancel();
+        _iconResolveCts?.Dispose();
+        _iconResolveCts = new CancellationTokenSource();
+        var token = _iconResolveCts.Token;
+
+        IsLoadingInstalledApps = true;
+        try
+        {
+            // Pass 1: fast enumeration without icons. Returns in <1s typically.
+            var packages = await Task.Run(InstalledPackageService.ListWithoutIcons, token);
+
+            InstalledPackages.Clear();
+            foreach (var p in packages)
+                InstalledPackages.Add(p);
+
+            HasLoadedInstalledApps = true;
+            IsLoadingInstalledApps = false;
+
+            // Pass 2: stream icons in. Fire-and-forget so the UI is responsive
+            // immediately. Exceptions are swallowed inside ResolveIcon.
+            _ = ResolveIconsAsync(token);
+        }
+        catch (OperationCanceledException)
+        {
+            IsLoadingInstalledApps = false;
+        }
+        catch (Exception ex)
+        {
+            IsLoadingInstalledApps = false;
+            ShowError($"Failed to list installed packages: {ex.Message}");
+        }
+    }
+
+    private async Task ResolveIconsAsync(CancellationToken token)
+    {
+        // Walk the collection. For each row:
+        //   1. Resolve raw icon bytes on background thread (file I/O + manifest parse).
+        //   2. On UI thread, decode bytes → BitmapImage with PROPER async/await
+        //      (no .GetAwaiter().GetResult() — that froze the UI in the prior version).
+        //   3. Replace the row with both IconBytes and a decoded IconImage set.
+        for (int i = 0; i < InstalledPackages.Count; i++)
+        {
+            if (token.IsCancellationRequested) return;
+
+            var current = InstalledPackages[i];
+            if (current.IconImage is not null) continue;
+
+            InstalledPackage resolved;
+            try
+            {
+                resolved = await Task.Run(() => InstalledPackageService.ResolveIcon(current), token);
+            }
+            catch (OperationCanceledException) { return; }
+            catch { continue; }
+
+            if (token.IsCancellationRequested) return;
+            if (resolved.IconBytes is not { Length: > 0 }) continue;
+
+            // Decode on UI thread (we're already back on it because we awaited Task.Run).
+            // Yield briefly between rows so other UI work — input, scrolling, layout —
+            // gets a turn. Without this, decoding ~200 icons back-to-back can still
+            // feel sluggish even though each decode is microseconds.
+            var bitmap = await DecodeBitmapAsync(resolved.IconBytes);
+            if (bitmap is null) continue;
+            if (token.IsCancellationRequested) return;
+
+            var idx = IndexOfByFamilyName(resolved.PackageFamilyName);
+            if (idx >= 0)
+                InstalledPackages[idx] = resolved with { IconImage = bitmap };
+
+            // Cooperative yield so the UI thread can service input between rows.
+            await Task.Yield();
+        }
+    }
+
+    private static async Task<Microsoft.UI.Xaml.Media.Imaging.BitmapImage?> DecodeBitmapAsync(byte[] bytes)
+    {
+        try
+        {
+            var bitmap = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage();
+            using var stream = new Windows.Storage.Streams.InMemoryRandomAccessStream();
+            using (var writer = new Windows.Storage.Streams.DataWriter(stream.GetOutputStreamAt(0)))
+            {
+                writer.WriteBytes(bytes);
+                await writer.StoreAsync();
+                writer.DetachStream();
+            }
+            stream.Seek(0);
+            await bitmap.SetSourceAsync(stream);
+            return bitmap;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private int IndexOfByFamilyName(string pfn)
+    {
+        for (int i = 0; i < InstalledPackages.Count; i++)
+        {
+            if (string.Equals(InstalledPackages[i].PackageFamilyName, pfn, StringComparison.OrdinalIgnoreCase))
+                return i;
+        }
+        return -1;
+    }
+
+    /// <summary>Cancels any in-flight icon-resolution loop. Call when the Apps pane closes.</summary>
+    public void CancelIconResolution()
+    {
+        _iconResolveCts?.Cancel();
+    }
+
+    private CancellationTokenSource? _iconResolveCts;
+
+    /// <summary>
+    /// Loads an installed package's manifest and runs it through the existing
+    /// analysis pipeline. Wired to the Apps submenu items in MainPage.
+    /// </summary>
+    public void OpenInstalledPackage(InstalledPackage package)
+    {
+        if (package.ManifestPath is null || !File.Exists(package.ManifestPath))
+        {
+            ShowError(
+                $"AppxManifest.xml not accessible at '{package.InstallLocation}'. " +
+                "WindowsApps folders may require elevated access for some packages.");
+            return;
+        }
+
+        try
+        {
+            PackageFilePath = $"Installed: {package.DisplayName} ({package.PackageFamilyName})";
+            var (manifest, rawXml, info) = ManifestParserService.ExtractFromManifestFile(package.ManifestPath);
+            AnalyzeManifest(rawXml, info, manifest);
+        }
+        catch (Exception ex)
+        {
+            ShowError($"Failed to analyze installed package: {ex.Message}");
+        }
+    }
+
     public void SelectSection(string tag)
     {
         SelectedSectionTag = tag;
         IsOverviewSelected = tag == "overview";
         IsRawXmlSelected = tag == "raw-xml";
         IsSectionSelected = !IsOverviewSelected && !IsRawXmlSelected;
+
+        // Keep the Sections pane ListView selection in sync. The setter is no-op
+        // when the tag already matches (see OnSelectedSectionChanged guard).
+        var match = Sections.FirstOrDefault(s => s.Tag == tag);
+        if (match is not null && !ReferenceEquals(SelectedSection, match))
+            SelectedSection = match;
 
         CurrentGroups.Clear();
         CategoryFindings.Clear();
@@ -223,7 +465,6 @@ public partial class MainPageViewModel : ObservableObject
 
         BuildSections();
         ComputeAssessment(info);
-        SectionsRebuilt?.Invoke();
     }
 
     private static RuleSeverityOverrides LoadUserRuleOverrides()

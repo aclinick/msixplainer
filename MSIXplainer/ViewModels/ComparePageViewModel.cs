@@ -61,6 +61,39 @@ public partial class ComparePageViewModel : ObservableObject
     [ObservableProperty] public partial bool HasDuplicates { get; set; }
     [ObservableProperty] public partial string DuplicatesHeadline { get; set; } = string.Empty;
 
+    /// <summary>
+    /// True only once a comparison has produced results AND there were no duplicate-file
+    /// groups. Used by the Duplicates view to show a positive empty-state InfoBar.
+    /// </summary>
+    [ObservableProperty] public partial bool IsDuplicatesEmpty { get; set; }
+
+    partial void OnHasDuplicatesChanged(bool value) => RecomputeDuplicatesEmpty();
+    partial void OnHasResultChanged(bool value) => RecomputeDuplicatesEmpty();
+    private void RecomputeDuplicatesEmpty() => IsDuplicatesEmpty = HasResult && !HasDuplicates;
+
+    /// <summary>
+    /// Which sub-view of the compare results is currently active. Values:
+    /// "diff" (default), "planner", "duplicates". Drives the IsXxxView booleans
+    /// that the right-pane content uses for Visibility.
+    /// </summary>
+    [ObservableProperty] public partial string SelectedCompareView { get; set; } = "diff";
+
+    [ObservableProperty] public partial bool IsDiffView { get; set; } = true;
+    [ObservableProperty] public partial bool IsBandwidthView { get; set; }
+    [ObservableProperty] public partial bool IsDuplicatesView { get; set; }
+
+    partial void OnSelectedCompareViewChanged(string value)
+    {
+        IsDiffView = value == "diff";
+        IsBandwidthView = value == "planner";
+        IsDuplicatesView = value == "duplicates";
+    }
+
+    /// <summary>Count of file diff rows — surfaced as an InfoBadge on the Diff nav item.</summary>
+    [ObservableProperty] public partial int FileChangeCount { get; set; }
+    /// <summary>Count of duplicate-group rows — surfaced as an InfoBadge on the Duplicates nav item.</summary>
+    [ObservableProperty] public partial int DuplicateGroupCount { get; set; }
+
     private UpdateDiffResult? _lastResult;
     private BandwidthEstimate? _lastBandwidth;
 
@@ -69,6 +102,13 @@ public partial class ComparePageViewModel : ObservableObject
 
     [RelayCommand]
     private async Task PickNewAsync() => NewPath = await PickPackageFileAsync() ?? NewPath;
+
+    /// <summary>
+    /// Swap the Old and New package paths. Useful when users pick the target version
+    /// first by reflex and then the installed version — saves them re-browsing both.
+    /// </summary>
+    [RelayCommand]
+    private void SwapPaths() => (OldPath, NewPath) = (NewPath, OldPath);
 
     [RelayCommand]
     private async Task ExportMarkdownAsync()
@@ -125,6 +165,9 @@ public partial class ComparePageViewModel : ObservableObject
             PopulateFromResult(_lastResult);
             RecalculateBandwidth();
             HasResult = true;
+            // Land on the Diff view by default after each successful comparison —
+            // it's the most informative answer to "what changed".
+            SelectedCompareView = "diff";
         }
         catch (Exception ex)
         {
@@ -242,6 +285,7 @@ public partial class ComparePageViewModel : ObservableObject
             .OrderByDescending(row => row.DeltaBytes)
             .Take(50);
         foreach (var f in top) TopFileChanges.Add(f);
+        FileChangeCount = TopFileChanges.Count;
 
         DuplicateGroups.Clear();
         var dups = r.PackageDiffs
@@ -270,6 +314,7 @@ public partial class ComparePageViewModel : ObservableObject
             HasDuplicates = false;
             DuplicatesHeadline = string.Empty;
         }
+        DuplicateGroupCount = dups.Count;
     }
 
     private static async Task<string?> PickPackageFileAsync()

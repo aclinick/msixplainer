@@ -1,3 +1,5 @@
+using System.Collections.Specialized;
+using System.ComponentModel;
 using Microsoft.UI;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
@@ -14,69 +16,177 @@ public sealed partial class MainPage : Page
 {
     public MainPageViewModel ViewModel { get; } = new();
 
+    // The top-level NavView only shows two static entry points (Apps, Compare).
+    // "Open package from disk…" lives inside the Apps pane as a primary action
+    // alongside the installed-apps list, since both are ways of picking a
+    // package to analyze. Settings lives in the footer rail.
+    private NavigationViewItem? _appsItem;
+    private NavigationViewItem? _compareItem;
+    private NavigationViewItem? _settingsItem;
+
     public MainPage()
     {
         InitializeComponent();
-        ViewModel.SectionsRebuilt += RebuildNavItems;
+        ViewModel.InstalledPackages.CollectionChanged += InstalledPackages_CollectionChanged;
+        ViewModel.PropertyChanged += ViewModel_PropertyChanged;
+        BuildStaticNavItems();
     }
 
-    private async void RebuildNavItems()
+    private void BuildStaticNavItems()
     {
-        NavView.MenuItems.Clear();
-        NavigationViewItem? firstItem = null;
-
-        foreach (var section in ViewModel.Sections)
+        _appsItem = new NavigationViewItem
         {
-            var item = new NavigationViewItem
-            {
-                Content = section.Label,
-                Tag = section.Tag,
-                Icon = new FontIcon { Glyph = section.IconGlyph }
-            };
-            AutomationProperties.SetAutomationId(item, $"Nav_{section.Tag}");
+            Content = "Apps",
+            Tag = "apps",
+            SelectsOnInvoked = false,
+            Icon = new FontIcon { Glyph = "\uE71D" } // AllApps
+        };
+        AutomationProperties.SetAutomationId(_appsItem, "NavApps");
 
-            if (section.Tag != "overview" && section.FindingCount > 0)
-            {
-                item.InfoBadge = new InfoBadge { Value = section.FindingCount };
-            }
+        _compareItem = new NavigationViewItem
+        {
+            Content = "Compare Versions…",
+            Tag = "compare",
+            SelectsOnInvoked = false,
+            Icon = new FontIcon { Glyph = "\uE8AB" } // Switch
+        };
+        AutomationProperties.SetAutomationId(_compareItem, "NavCompareVersions");
 
-            // Load app icon from package if available
-            if (section.IconBytes is { Length: > 0 })
-            {
-                try
-                {
-                    var bitmap = new BitmapImage();
-                    using var stream = new InMemoryRandomAccessStream();
-                    using (var writer = new DataWriter(stream.GetOutputStreamAt(0)))
-                    {
-                        writer.WriteBytes(section.IconBytes);
-                        await writer.StoreAsync();
-                        writer.DetachStream();
-                    }
-                    stream.Seek(0);
-                    await bitmap.SetSourceAsync(stream);
-                    item.Icon = new ImageIcon { Source = bitmap, Width = 16, Height = 16 };
-                }
-                catch
-                {
-                    // Keep FontIcon fallback
-                }
-            }
+        NavView.MenuItems.Add(_appsItem);
+        NavView.MenuItems.Add(_compareItem);
 
-            NavView.MenuItems.Add(item);
-            firstItem ??= item;
+        _settingsItem = new NavigationViewItem
+        {
+            Content = "Settings",
+            Tag = "settings",
+            SelectsOnInvoked = false,
+            Icon = new FontIcon { Glyph = "\uE713" } // Gear
+        };
+        AutomationProperties.SetAutomationId(_settingsItem, "NavSettings");
+        NavView.FooterMenuItems.Add(_settingsItem);
+    }
+
+    private void InstalledPackages_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        // No-op: the ListView in the Apps pane binds directly to ViewModel.InstalledPackages.
+    }
+
+    private void ViewModel_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        // When a package is loaded the Sections pane appears in column 0; auto-collapse
+        // the primary nav rail so the user's attention shifts to the loaded package.
+        if (e.PropertyName == nameof(MainPageViewModel.IsPackageLoaded) && ViewModel.IsPackageLoaded)
+        {
+            NavView.IsPaneOpen = false;
         }
+    }
 
-        if (firstItem is not null)
-            NavView.SelectedItem = firstItem;
+    private async void NavView_Expanding(NavigationView sender, NavigationViewItemExpandingEventArgs args)
+    {
+        if (args.ExpandingItemContainer is NavigationViewItem nvi && nvi.Tag is "apps")
+        {
+            nvi.IsExpanded = false;
+            await OpenAppsPaneAsync();
+        }
+    }
+
+    private async void NavView_ItemInvoked(NavigationView sender, NavigationViewItemInvokedEventArgs args)
+    {
+        if (args.InvokedItemContainer is not NavigationViewItem invoked) return;
+
+        switch (invoked.Tag)
+        {
+            case "apps":
+                await OpenAppsPaneAsync();
+                break;
+
+            case "compare":
+                CloseAppsPane();
+                ExitSettingsMode();
+                EnterCompareMode();
+                break;
+
+            case "settings":
+                CloseAppsPane();
+                ExitCompareMode();
+                EnterSettingsMode();
+                break;
+        }
+    }
+
+    private async void OnOpenPackageFromDiskClick(object sender, RoutedEventArgs e)
+    {
+        CloseAppsPane();
+        ExitCompareMode();
+        ExitSettingsMode();
+        await ViewModel.OpenPackageCommand.ExecuteAsync(null);
     }
 
     private void NavView_SelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
     {
-        if (args.SelectedItem is NavigationViewItem item && item.Tag is string tag)
+        // The three static items are SelectsOnInvoked="False" so this should not fire
+        // during normal use. Safety net.
+    }
+
+    private async Task OpenAppsPaneAsync()
+    {
+        ViewModel.IsAppsPaneOpen = true;
+        if (!ViewModel.HasLoadedInstalledApps && !ViewModel.IsLoadingInstalledApps)
+            await ViewModel.LoadInstalledAppsCommand.ExecuteAsync(null);
+    }
+
+    private void CloseAppsPane()
+    {
+        ViewModel.IsAppsPaneOpen = false;
+        ViewModel.CancelIconResolution();
+    }
+
+    private void OnCloseAppsPaneClick(object sender, RoutedEventArgs e) => CloseAppsPane();
+
+    private void OnRawXmlClick(object sender, RoutedEventArgs e)
+    {
+        ViewModel.SelectSection("raw-xml");
+    }
+
+    private void OnInstalledAppClick(object sender, ItemClickEventArgs e)
+    {
+        if (e.ClickedItem is InstalledPackage pkg)
         {
-            ViewModel.SelectSection(tag);
+            ExitCompareMode();
+            ExitSettingsMode();
+            ViewModel.OpenInstalledPackage(pkg);
+            // Close the Apps pane so the Sections pane (which now hosts the loaded
+            // package's nav + actions) takes over column 0.
+            CloseAppsPane();
         }
+    }
+
+    private void EnterCompareMode()
+    {
+        ViewModel.IsCompareMode = true;
+        if (CompareFrame.Content is null)
+            CompareFrame.Navigate(typeof(Pages.ComparePage));
+    }
+
+    internal void ExitCompareMode()
+    {
+        if (!ViewModel.IsCompareMode) return;
+        ViewModel.IsCompareMode = false;
+        CompareFrame.Content = null;
+    }
+
+    private void EnterSettingsMode()
+    {
+        ViewModel.IsSettingsMode = true;
+        if (SettingsFrame.Content is null)
+            SettingsFrame.Navigate(typeof(Pages.SettingsPage));
+    }
+
+    internal void ExitSettingsMode()
+    {
+        if (!ViewModel.IsSettingsMode) return;
+        ViewModel.IsSettingsMode = false;
+        SettingsFrame.Content = null;
     }
 
     private void ViewFinding_Click(object sender, RoutedEventArgs e)
@@ -87,11 +197,9 @@ public sealed partial class MainPage : Page
 
     /// <summary>
     /// Copies a manifest property value to the clipboard. Wraps the clipboard
-    /// call in try/catch so a transient clipboard failure (e.g. another
-    /// process holding it open) never bubbles up as an unhandled exception.
-    /// Bug fix for #10 — the built-in TextBlock context-menu Copy was
-    /// crashing the app on some Windows builds; this gives users a reliable
-    /// alternative.
+    /// call in try/catch so a transient clipboard failure never bubbles up as
+    /// an unhandled exception. Bug fix for #10 — the built-in TextBlock
+    /// context-menu Copy was crashing the app on some Windows builds.
     /// </summary>
     private void CopyPropertyValue_Click(object sender, RoutedEventArgs e)
     {
@@ -128,6 +236,47 @@ public sealed partial class MainPage : Page
 
     public static Visibility StringToVisibility(string? value) =>
         string.IsNullOrWhiteSpace(value) ? Visibility.Collapsed : Visibility.Visible;
+
+    public static Visibility NullBytesToVisibility(byte[]? value) =>
+        value is { Length: > 0 } ? Visibility.Collapsed : Visibility.Visible;
+
+    public static Visibility NonNullBytesToVisibility(byte[]? value) =>
+        value is { Length: > 0 } ? Visibility.Visible : Visibility.Collapsed;
+
+    public static Visibility NullObjectToVisibility(object? value) =>
+        value is null ? Visibility.Visible : Visibility.Collapsed;
+
+    public static Visibility NonNullObjectToVisibility(object? value) =>
+        value is null ? Visibility.Collapsed : Visibility.Visible;
+
+    public static Visibility PositiveIntToVisibility(int value) =>
+        value > 0 ? Visibility.Visible : Visibility.Collapsed;
+
+    public static Microsoft.UI.Xaml.Media.ImageSource? ObjectToImageSource(object? value) =>
+        value as Microsoft.UI.Xaml.Media.ImageSource;
+
+    public static BitmapImage? BytesToBitmap(byte[]? bytes)
+    {
+        if (bytes is null || bytes.Length == 0) return null;
+        try
+        {
+            var bitmap = new BitmapImage();
+            using var stream = new InMemoryRandomAccessStream();
+            using (var writer = new DataWriter(stream.GetOutputStreamAt(0)))
+            {
+                writer.WriteBytes(bytes);
+                writer.StoreAsync().GetAwaiter().GetResult();
+                writer.DetachStream();
+            }
+            stream.Seek(0);
+            bitmap.SetSourceAsync(stream).GetAwaiter().GetResult();
+            return bitmap;
+        }
+        catch
+        {
+            return null;
+        }
+    }
 
     public static SolidColorBrush SeverityToBrush(FindingSeverity severity) => severity switch
     {

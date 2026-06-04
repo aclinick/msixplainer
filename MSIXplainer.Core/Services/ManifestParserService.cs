@@ -103,6 +103,29 @@ public static class ManifestParserService
         return (doc, xml, info);
     }
 
+    /// <summary>
+    /// Parses a loose <c>AppxManifest.xml</c> file from disk — used for analyzing
+    /// already-installed packages where Windows has expanded the .msix to a
+    /// folder under <c>%ProgramFiles%\WindowsApps</c>. Resolves the app icon
+    /// from the same directory when possible.
+    /// </summary>
+    public static (XDocument Manifest, string RawXml, PackageInfo Info) ExtractFromManifestFile(string manifestPath)
+    {
+        if (!File.Exists(manifestPath))
+            throw new FileNotFoundException("AppxManifest.xml not found.", manifestPath);
+
+        var fileInfo = new FileInfo(manifestPath);
+        if (fileInfo.Length > 10 * 1024 * 1024)
+            throw new InvalidOperationException(
+                "AppxManifest.xml exceeds 10 MB — this is abnormal for a package manifest.");
+
+        var rawXml = File.ReadAllText(manifestPath);
+        var doc = ParseXmlSafely(rawXml);
+        var info = ExtractPackageInfo(doc);
+        info.AppIconBytes = TryExtractAppIconFromFolder(Path.GetDirectoryName(manifestPath)!, doc);
+        return (doc, rawXml, info);
+    }
+
     private static (XDocument Manifest, string RawXml, PackageInfo Info) ExtractFromArchive(ZipArchive archive)
     {
         var entry = archive.GetEntry("AppxManifest.xml")
@@ -225,5 +248,78 @@ public static class ManifestParserService
         using var ms = new MemoryStream();
         stream.CopyTo(ms);
         return ms.ToArray();
+    }
+
+    /// <summary>
+    /// Attempts to read the Square44x44 app icon bytes from an installed package's
+    /// extracted folder. Returns <c>null</c> if the manifest can't be read, no icon
+    /// is referenced, or file access is denied (common under <c>WindowsApps</c>).
+    /// </summary>
+    public static byte[]? TryGetIconFromInstallFolder(string installFolder)
+    {
+        if (string.IsNullOrEmpty(installFolder)) return null;
+
+        var manifestPath = Path.Combine(installFolder, "AppxManifest.xml");
+        if (!File.Exists(manifestPath)) return null;
+
+        try
+        {
+            var doc = ParseXmlSafely(File.ReadAllText(manifestPath));
+            return TryExtractAppIconFromFolder(installFolder, doc);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static byte[]? TryExtractAppIconFromFolder(string folder, XDocument doc)
+    {
+        var app = doc.Root!.Element(Ns + "Applications")?.Element(Ns + "Application");
+        if (app is null) return null;
+
+        var ve = app.Descendants().FirstOrDefault(e => e.Name.LocalName == "VisualElements");
+        var iconPath = ve?.Attribute("Square44x44Logo")?.Value;
+        if (string.IsNullOrEmpty(iconPath)) return null;
+
+        return TryReadIconFile(folder, iconPath);
+    }
+
+    private static byte[]? TryReadIconFile(string folder, string relativePath)
+    {
+        // Manifest paths use Windows-style separators; normalise for cross-platform.
+        var normalized = relativePath.Replace('/', Path.DirectorySeparatorChar)
+                                     .Replace('\\', Path.DirectorySeparatorChar);
+
+        var candidates = new List<string> { Path.Combine(folder, normalized) };
+
+        // Try scale variants — Windows expands install location to include scaled assets.
+        var dir = Path.GetDirectoryName(normalized) ?? "";
+        var baseName = Path.GetFileNameWithoutExtension(normalized);
+        var ext = Path.GetExtension(normalized);
+        foreach (var scale in new[] { "scale-200", "scale-150", "scale-125", "scale-100", "scale-400" })
+        {
+            var scaled = string.IsNullOrEmpty(dir)
+                ? $"{baseName}.{scale}{ext}"
+                : Path.Combine(dir, $"{baseName}.{scale}{ext}");
+            candidates.Add(Path.Combine(folder, scaled));
+        }
+
+        foreach (var candidate in candidates)
+        {
+            try
+            {
+                if (!File.Exists(candidate)) continue;
+                var info = new FileInfo(candidate);
+                if (info.Length > 1024 * 1024) continue;
+                return File.ReadAllBytes(candidate);
+            }
+            catch
+            {
+                // WindowsApps may deny read access; skip and try next candidate.
+            }
+        }
+
+        return null;
     }
 }

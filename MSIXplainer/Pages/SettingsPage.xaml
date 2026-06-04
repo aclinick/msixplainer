@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Page
+    x:Class="MSIXplainer.Pages.SettingsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:local="using:MSIXplainer.Pages"
+    mc:Ignorable="d">
+
+    <ScrollViewer Padding="32" VerticalScrollBarVisibility="Auto">
+        <StackPanel MaxWidth="720" HorizontalAlignment="Stretch" Spacing="32">
+
+            <StackPanel Spacing="6">
+                <TextBlock Text="Settings"
+                           Style="{StaticResource TitleTextBlockStyle}" />
+                <TextBlock Text="Preferences and app information."
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+            </StackPanel>
+
+            <!-- ── Appearance ── -->
+            <StackPanel Spacing="12">
+                <TextBlock Text="Appearance"
+                           Style="{StaticResource SubtitleTextBlockStyle}" />
+                <Border Background="{ThemeResource LayerFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                        BorderThickness="1"
+                        CornerRadius="8"
+                        Padding="20">
+                    <StackPanel Spacing="12">
+                        <TextBlock Text="App theme"
+                                   Style="{StaticResource BodyStrongTextBlockStyle}" />
+                        <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                   Text="Choose how MSIXplainer looks. 'Use system setting' follows your Windows preference."
+                                   TextWrapping="Wrap" />
+                        <RadioButtons x:Name="ThemeRadios"
+                                      AutomationProperties.AutomationId="ThemeRadios"
+                                      SelectionChanged="OnThemeChanged">
+                            <RadioButton x:Name="ThemeLightRadio"
+                                         AutomationProperties.AutomationId="ThemeLightRadio"
+                                         Content="Light" Tag="Light" />
+                            <RadioButton x:Name="ThemeDarkRadio"
+                                         AutomationProperties.AutomationId="ThemeDarkRadio"
+                                         Content="Dark" Tag="Dark" />
+                            <RadioButton x:Name="ThemeDefaultRadio"
+                                         AutomationProperties.AutomationId="ThemeDefaultRadio"
+                                         Content="Use system setting" Tag="Default" />
+                        </RadioButtons>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- ── About ── -->
+            <StackPanel Spacing="12">
+                <TextBlock Text="About"
+                           Style="{StaticResource SubtitleTextBlockStyle}" />
+                <Border Background="{ThemeResource LayerFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}"
+                        BorderThickness="1"
+                        CornerRadius="8"
+                        Padding="20">
+                    <Grid ColumnSpacing="20" RowSpacing="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="App version"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        <TextBlock Grid.Row="0" Grid.Column="1"
+                                   x:Name="VersionText"
+                                   AutomationProperties.AutomationId="VersionText"
+                                   Style="{StaticResource BodyStrongTextBlockStyle}" />
+
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Architecture"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        <TextBlock Grid.Row="1" Grid.Column="1"
+                                   x:Name="ArchitectureText"
+                                   AutomationProperties.AutomationId="ArchitectureText" />
+
+                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Project"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        <HyperlinkButton Grid.Row="2" Grid.Column="1"
+                                         Content="github.com/aclinick/msixexplainer"
+                                         NavigateUri="https://github.com/aclinick/msixexplainer"
+                                         Padding="0" />
+                    </Grid>
+                </Border>
+            </StackPanel>
+
+        </StackPanel>
+    </ScrollViewer>
+</Page>

@@ -48,8 +48,8 @@ public static class UpdateDiffService
         var oldInners = BundleManifestParser.ExtractFromBundle(oldBundlePath);
         var newInners = BundleManifestParser.ExtractFromBundle(newBundlePath);
 
-        var oldByKey = oldInners.ToDictionary(p => p.MatchKey, StringComparer.Ordinal);
-        var newByKey = newInners.ToDictionary(p => p.MatchKey, StringComparer.Ordinal);
+        var oldByKey = BuildInnerLookup(oldInners);
+        var newByKey = BuildInnerLookup(newInners);
 
         var packageDiffs = new List<PackageDiff>();
         var added = new List<string>();
@@ -99,6 +99,23 @@ public static class UpdateDiffService
             RemovedPackages = removed,
             Warnings = warnings
         };
+    }
+
+    /// <summary>
+    /// Builds a MatchKey -> first BundleInnerPackage dictionary, tolerating duplicates
+    /// (some bundles ship multiple inner packages that collapse to the same identity
+    /// attributes — we keep the first and ignore subsequent duplicates rather than
+    /// crashing).
+    /// </summary>
+    private static Dictionary<string, BundleInnerPackage> BuildInnerLookup(
+        IReadOnlyList<BundleInnerPackage> inners)
+    {
+        var map = new Dictionary<string, BundleInnerPackage>(StringComparer.Ordinal);
+        foreach (var p in inners)
+        {
+            map.TryAdd(p.MatchKey, p);
+        }
+        return map;
     }
 
     /// <summary>

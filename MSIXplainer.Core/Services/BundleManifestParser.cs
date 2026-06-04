@@ -62,6 +62,16 @@ public static class BundleManifestParser
             var fileName = p.Attribute("FileName")?.Value ?? string.Empty;
             if (string.IsNullOrEmpty(fileName)) continue;
 
+            // Normalize path separator: bundle manifests sometimes use '\' but
+            // the underlying ZIP entry names always use '/'.
+            fileName = fileName.Replace('\\', '/');
+
+            // Skip stub packages (AppxMetadata/Stub/*.msix). Stubs are metadata-only
+            // placeholders used by the platform for bundle delta servicing — they
+            // don't carry a real block map or payload, so they have nothing to diff.
+            if (fileName.StartsWith("AppxMetadata/", StringComparison.OrdinalIgnoreCase))
+                continue;
+
             var type = p.Attribute("Type")?.Value ?? "application";
             var version = p.Attribute("Version")?.Value ?? string.Empty;
             var arch = p.Attribute("Architecture")?.Value ?? "neutral";
