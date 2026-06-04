@@ -356,7 +356,8 @@
                                 <!-- All findings -->
                                 <TextBlock Text="All Findings" Style="{StaticResource SubtitleTextBlockStyle}" />
 
-                                <ListView AutomationProperties.AutomationId="OverviewFindingsList"
+                                <ListView x:Name="OverviewFindingsList"
+                                          AutomationProperties.AutomationId="OverviewFindingsList"
                                           ItemsSource="{x:Bind ViewModel.CategoryFindings, Mode=OneWay}"
                                           SelectedItem="{x:Bind ViewModel.SelectedFinding, Mode=TwoWay}"
                                           SelectionMode="Single">
@@ -519,9 +520,10 @@
                                     <!-- Close button -->
                                     <Button AutomationProperties.AutomationId="BtnCloseFinding"
                                             HorizontalAlignment="Right"
-                                            Command="{x:Bind ViewModel.DismissSelectedFindingCommand}"
+                                            Click="OnCloseFindingClick"
                                             Padding="4" MinWidth="0" MinHeight="0"
-                                            Background="Transparent" BorderThickness="0">
+                                            Background="Transparent" BorderThickness="0"
+                                            ToolTipService.ToolTip="Close">
                                         <FontIcon Glyph="&#xE711;" FontSize="12" />
                                     </Button>
 

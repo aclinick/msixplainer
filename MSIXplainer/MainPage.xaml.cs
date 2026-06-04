@@ -97,6 +97,8 @@ public sealed partial class MainPage : Page
         switch (invoked.Tag)
         {
             case "apps":
+                ExitCompareMode();
+                ExitSettingsMode();
                 await OpenAppsPaneAsync();
                 break;
 
@@ -193,6 +195,17 @@ public sealed partial class MainPage : Page
     {
         if (sender is FrameworkElement fe && fe.Tag is ManifestFinding finding)
             ViewModel.SelectedFinding = finding;
+    }
+
+    /// <summary>
+    /// Closes the finding detail pane. Clears the OverviewFindingsList selection
+    /// explicitly first so the TwoWay binding can't immediately re-push the old
+    /// selection back into ViewModel.SelectedFinding once we null it.
+    /// </summary>
+    private void OnCloseFindingClick(object sender, RoutedEventArgs e)
+    {
+        OverviewFindingsList.SelectedItem = null;
+        ViewModel.SelectedFinding = null;
     }
 
     /// <summary>
