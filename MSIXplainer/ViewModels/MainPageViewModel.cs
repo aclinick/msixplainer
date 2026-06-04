@@ -25,6 +25,22 @@ public partial class MainPageViewModel : ObservableObject
     [ObservableProperty]
     public partial ManifestFinding? SelectedFinding { get; set; }
 
+    /// <summary>
+    /// Whether the right-side finding-detail pane should be visible. Tracked as a
+    /// distinct observable bool (rather than binding visibility to a
+    /// NullToCollapsed function on SelectedFinding) because the x:Bind function
+    /// re-evaluation was unreliable in combination with the Overview ListView's
+    /// TwoWay SelectedItem binding — the pane would stay open after the close
+    /// button cleared the selection. See issue #15.
+    /// </summary>
+    [ObservableProperty]
+    public partial bool IsFindingDetailVisible { get; set; }
+
+    partial void OnSelectedFindingChanged(ManifestFinding? value)
+    {
+        IsFindingDetailVisible = value is not null;
+    }
+
     [ObservableProperty]
     public partial string AssessmentMessage { get; set; } = string.Empty;
 

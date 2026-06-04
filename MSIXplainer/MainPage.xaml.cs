@@ -200,12 +200,15 @@ public sealed partial class MainPage : Page
     /// <summary>
     /// Closes the finding detail pane. Clears the OverviewFindingsList selection
     /// explicitly first so the TwoWay binding can't immediately re-push the old
-    /// selection back into ViewModel.SelectedFinding once we null it.
+    /// selection back into ViewModel.SelectedFinding once we null it. Then
+    /// explicitly toggles IsFindingDetailVisible so the pane collapses even if
+    /// the SelectedFinding PropertyChanged notification gets coalesced.
     /// </summary>
     private void OnCloseFindingClick(object sender, RoutedEventArgs e)
     {
         OverviewFindingsList.SelectedItem = null;
         ViewModel.SelectedFinding = null;
+        ViewModel.IsFindingDetailVisible = false;
     }
 
     /// <summary>
