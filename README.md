@@ -6,6 +6,7 @@ Instead of reading raw XML, you get categorized findings with severity ratings, 
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![CI](https://github.com/aclinick/msixplainer/actions/workflows/ci.yml/badge.svg)](https://github.com/aclinick/msixplainer/actions/workflows/ci.yml)
+[![Microsoft Store](https://img.shields.io/badge/Microsoft%20Store-Get%20it-blue?logo=microsoft)](https://apps.microsoft.com/detail/9N7X47BX4R58)
 
 ---
 
@@ -40,6 +41,26 @@ MSIXplainer is two tools in one:
 - Exports diff + planner numbers to Markdown or JSON
 
 Everything runs locally. **No cloud service, no LLM, no telemetry, no network calls.** Packages are treated as untrusted input — no code from a package is ever executed.
+
+## Install
+
+### Microsoft Store (recommended)
+
+[**Get MSIXplainer from the Microsoft Store**](https://apps.microsoft.com/detail/9N7X47BX4R58) — signed, sandboxed, auto-updates.
+
+Or from a terminal:
+
+```powershell
+winget install --id 9N7X47BX4R58 --source msstore
+```
+
+The Store install gives you both the **WinUI app** (search "MSIXplainer" in Start) and the **`msixplainer` CLI** (available on `PATH` automatically).
+
+### Build from source
+
+For contributors and air-gapped dev/test only. The `.msixbundle` produced by `Package.ps1` is signed with a **self-signed certificate** included in the repo and is **not suitable for distribution** — use the Store for production installs.
+
+See [Getting Started](#getting-started) below.
 
 ## Getting Started
 
