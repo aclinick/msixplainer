@@ -511,7 +511,7 @@
 
                         <!-- ── FINDING DETAIL PANE (shared, right side) ── -->
                         <Border Grid.Column="1" Width="380"
-                                Visibility="{x:Bind local:MainPage.NullToCollapsed(ViewModel.SelectedFinding), Mode=OneWay}"
+                                Visibility="{x:Bind local:MainPage.BoolToVisibility(ViewModel.IsFindingDetailVisible), Mode=OneWay}"
                                 Background="{ThemeResource LayerFillColorDefaultBrush}"
                                 BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                                 BorderThickness="1,0,0,0">
@@ -519,12 +519,13 @@
                                 <StackPanel Spacing="16">
                                     <!-- Close button -->
                                     <Button AutomationProperties.AutomationId="BtnCloseFinding"
+                                            AutomationProperties.Name="Close finding details"
                                             HorizontalAlignment="Right"
                                             Click="OnCloseFindingClick"
-                                            Padding="4" MinWidth="0" MinHeight="0"
+                                            Padding="8" MinWidth="32" MinHeight="32"
                                             Background="Transparent" BorderThickness="0"
                                             ToolTipService.ToolTip="Close">
-                                        <FontIcon Glyph="&#xE711;" FontSize="12" />
+                                        <FontIcon Glyph="&#xE711;" FontSize="14" />
                                     </Button>
 
                                     <!-- Header -->
