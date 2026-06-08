@@ -4,6 +4,7 @@ using Microsoft.UI.Xaml.Data;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Navigation;
+using System.Linq;
 
 // To learn more about WinUI, the WinUI project structure,
 // and more about our project templates, see: http://aka.ms/winui-project-info.
@@ -60,16 +61,70 @@ public partial class App : Application
     }
 
     /// <summary>
+    /// File path provided via file activation (right-click → Open with
+    /// MSIXplainer). MainPage reads this on construction and loads the
+    /// package. Null when the app was launched normally.
+    /// </summary>
+    public static string? PendingFileActivationPath { get; private set; }
+
+    /// <summary>
+    /// Clears the pending file-activation path. Call after the path has been
+    /// loaded so it isn't re-applied on subsequent page reloads.
+    /// </summary>
+    public static void ConsumePendingFileActivationPath() => PendingFileActivationPath = null;
+
+    /// <summary>
     /// Invoked when the application is launched.
     /// </summary>
     /// <param name="args">Details about the launch request and process.</param>
     protected override void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
     {
+        // Capture file-activation arg BEFORE MainWindow is constructed so
+        // MainPage can pick it up during its own construction. See #20.
+        PendingFileActivationPath = TryGetFileActivationPath();
+
         Window = new MainWindow();
         DispatcherQueue = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
         Window.Activate();
         // Apply persisted theme after Window.Content is set so the FrameworkElement
         // root exists. ThemeService.Apply no-ops if Content is still null.
         MSIXplainer.Services.ThemeService.Apply(MSIXplainer.Services.ThemeService.LoadPreference());
+    }
+
+    /// <summary>
+    /// If the app was launched via a file activation, return the first file's
+    /// path; otherwise return null. Safe to call early in OnLaunched.
+    /// </summary>
+    private static string? TryGetFileActivationPath()
+    {
+        try
+        {
+            var activated = Microsoft.Windows.AppLifecycle.AppInstance
+                .GetCurrent()
+                .GetActivatedEventArgs();
+
+            System.Diagnostics.Debug.WriteLine(
+                $"[MSIXplainer] Activation kind: {activated.Kind}");
+
+            if (activated.Kind != Microsoft.Windows.AppLifecycle.ExtendedActivationKind.File)
+                return null;
+
+            if (activated.Data is not Windows.ApplicationModel.Activation.IFileActivatedEventArgs fileArgs)
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    $"[MSIXplainer] Activation data is {activated.Data?.GetType().FullName ?? "null"}, not IFileActivatedEventArgs");
+                return null;
+            }
+
+            var firstFile = fileArgs.Files.FirstOrDefault();
+            System.Diagnostics.Debug.WriteLine(
+                $"[MSIXplainer] File activation path: {firstFile?.Path ?? "<null>"}");
+            return firstFile?.Path;
+        }
+        catch (System.Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[MSIXplainer] File activation failed: {ex.Message}");
+            return null;
+        }
     }
 }

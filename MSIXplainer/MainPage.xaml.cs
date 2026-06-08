@@ -30,6 +30,21 @@ public sealed partial class MainPage : Page
         ViewModel.InstalledPackages.CollectionChanged += InstalledPackages_CollectionChanged;
         ViewModel.PropertyChanged += ViewModel_PropertyChanged;
         BuildStaticNavItems();
+        Loaded += MainPage_Loaded;
+    }
+
+    private void MainPage_Loaded(object sender, RoutedEventArgs e)
+    {
+        // File activation: if the app was launched by right-clicking a .msix /
+        // .msixbundle in Explorer (see App.PendingFileActivationPath / issue #20),
+        // load it now that the page is fully wired up. Consume the path so a
+        // page reload doesn't reopen it.
+        var path = App.PendingFileActivationPath;
+        if (!string.IsNullOrEmpty(path))
+        {
+            App.ConsumePendingFileActivationPath();
+            ViewModel.LoadPackageFromPath(path);
+        }
     }
 
     private void BuildStaticNavItems()
@@ -212,10 +227,9 @@ public sealed partial class MainPage : Page
     }
 
     /// <summary>
-    /// Copies a manifest property value to the clipboard. Wraps the clipboard
-    /// call in try/catch so a transient clipboard failure never bubbles up as
-    /// an unhandled exception. Bug fix for #10 — the built-in TextBlock
-    /// context-menu Copy was crashing the app on some Windows builds.
+    /// Copies a manifest property value to the clipboard. The 3-line WinUI
+    /// pattern works as long as the process's Main is marked [STAThread] —
+    /// see Program.cs and the comment there about issue #21.
     /// </summary>
     private void CopyPropertyValue_Click(object sender, RoutedEventArgs e)
     {
@@ -224,13 +238,14 @@ public sealed partial class MainPage : Page
 
         try
         {
-            var package = new Windows.ApplicationModel.DataTransfer.DataPackage();
-            package.SetText(value);
-            Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(package);
+            var pkg = new Windows.ApplicationModel.DataTransfer.DataPackage();
+            pkg.SetText(value);
+            Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(pkg);
         }
         catch (System.Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[MSIXplainer] Clipboard copy failed: {ex.Message}");
+            System.Diagnostics.Debug.WriteLine(
+                $"[MSIXplainer] Clipboard copy failed: {ex.GetType().Name} 0x{ex.HResult:X8} {ex.Message}");
         }
     }
 

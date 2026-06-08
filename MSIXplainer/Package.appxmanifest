@@ -11,7 +11,7 @@
   <Identity
     Name="Clinick.msixplainer"
     Publisher="CN=46604BD4-AFD9-4B23-8EB3-10EAF66872A5"
-    Version="1.0.24.0" />
+    Version="1.0.27.0" />
 
   <mp:PhoneIdentity PhoneProductId="3a09e9f9-55b1-418a-9e63-9a662f1a29bc" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
 
@@ -44,6 +44,20 @@
         <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" />
         <uap:SplashScreen Image="Assets\SplashScreen.png" />
       </uap:VisualElements>
+      <Extensions>
+        <uap:Extension Category="windows.fileTypeAssociation">
+          <uap:FileTypeAssociation Name="msixplainer.packages">
+            <uap:DisplayName>MSIX Package</uap:DisplayName>
+            <uap:Logo>Assets\Square44x44Logo.png</uap:Logo>
+            <uap:SupportedFileTypes>
+              <uap:FileType>.msix</uap:FileType>
+              <uap:FileType>.msixbundle</uap:FileType>
+              <uap:FileType>.appx</uap:FileType>
+              <uap:FileType>.appxbundle</uap:FileType>
+            </uap:SupportedFileTypes>
+          </uap:FileTypeAssociation>
+        </uap:Extension>
+      </Extensions>
     </Application>
     <Application Id="Cli"
       Executable="MSIXplainer.Cli.exe"
