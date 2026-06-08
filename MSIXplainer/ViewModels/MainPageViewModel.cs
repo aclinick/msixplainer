@@ -180,19 +180,35 @@ public partial class MainPageViewModel : ObservableObject
             var result = await picker.PickSingleFileAsync();
             if (result is null) return;
 
-            PackageFilePath = result.Path;
+            LoadPackageFromPath(result.Path);
+        }
+        catch (Exception ex)
+        {
+            ShowError($"Failed to open package: {ex.Message}");
+        }
+    }
 
-            if (ManifestParserService.IsBundleFile(result.Path))
+    /// <summary>
+    /// Loads and analyzes a package from a file path. Used by both the file
+    /// picker flow and the file-activation flow (right-click → Open with
+    /// MSIXplainer) — see issue #20.
+    /// </summary>
+    public void LoadPackageFromPath(string path)
+    {
+        try
+        {
+            PackageFilePath = path;
+
+            if (ManifestParserService.IsBundleFile(path))
             {
-                var packages = ManifestParserService.ExtractFromBundle(result.Path);
-                // Analyze the first package in the bundle (typically the current platform arch)
+                var packages = ManifestParserService.ExtractFromBundle(path);
                 var pkg = packages.First();
-                PackageFilePath = $"{result.Path} ({pkg.Label})";
+                PackageFilePath = $"{path} ({pkg.Label})";
                 AnalyzeManifest(pkg.RawXml, pkg.Info, pkg.Manifest);
             }
             else
             {
-                var (manifest, rawXml, info) = ManifestParserService.ExtractFromPackage(result.Path);
+                var (manifest, rawXml, info) = ManifestParserService.ExtractFromPackage(path);
                 AnalyzeManifest(rawXml, info, manifest);
             }
         }
